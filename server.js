@@ -1,11 +1,13 @@
 require('dotenv').config(); // Load environment variables
 const express = require('express');
 const mongoose = require('mongoose');
-
+const job = require("./lib/cron")
 
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes')
 
+
+job.start();
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
