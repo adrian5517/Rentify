@@ -1,10 +1,14 @@
-require('dotenv').config(); // Load environment variables
+require('dotenv').config(); 
 const express = require('express');
 const mongoose = require('mongoose');
-const job = require("./lib/cron")
+const cron = require("node-cron");
 
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes')
+
+const job = cron.schedule("*/15 * * * *", () => {
+    console.log("Cron job executed: Running every 15 minutes.");
+  }, { scheduled: false });  // 'scheduled: false' prevents auto-start
 
 
 job.start();
