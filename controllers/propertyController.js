@@ -2,12 +2,13 @@ const Property = require('../models/propertyModel');
 
 // Create a new property
 const createProperty = async (req, res) => {
-  const { name, address, price, description } = req.body;
+  const { name, address, price, description, ownerId } = req.body; // Ensure ownerId is passed
 
   // Handle image upload
   const images = req.files ? req.files.map(file => file.path) : [];
 
-  if (!name || !address || !price || !description) {
+  // Validate required fields
+  if (!name || !address || !price || !description || !ownerId) {
     return res.status(400).json({ message: 'All fields are required' });
   }
 
@@ -19,7 +20,7 @@ const createProperty = async (req, res) => {
       price,
       description,
       images,
-      ownerId,
+      ownerId, // Use ownerId from the request body
     });
 
     await newProperty.save(); // Save the new property to the database
@@ -42,7 +43,7 @@ const getAllProperties = async (req, res) => {
 // Get a specific property by ID
 const getPropertyById = async (req, res) => {
   const { id } = req.params;
-  
+
   try {
     const property = await Property.findById(id); // Find property by ID
     if (!property) {
@@ -57,7 +58,7 @@ const getPropertyById = async (req, res) => {
 // Update a property by ID
 const updateProperty = async (req, res) => {
   const { id } = req.params;
-  const { name, address, price, description } = req.body;
+  const { name, address, price, description, ownerId } = req.body; // Ensure ownerId is passed
 
   // Handle image upload
   const images = req.files ? req.files.map(file => file.path) : [];
@@ -69,7 +70,7 @@ const updateProperty = async (req, res) => {
       price,
       description,
       images,
-      ownerId,
+      ownerId, // Update ownerId as well
     }, { new: true }); // { new: true } ensures that the updated document is returned
 
     if (!updatedProperty) {
