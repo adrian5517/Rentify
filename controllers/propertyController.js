@@ -26,37 +26,36 @@ const uploadImages = upload.array('images', 7);
 
 // Controller to create a property
 const createProperty = async (req, res) => {
-    const { name, description, address, city, province, zipCode, coordinates, price, type, availableRooms, amenities, status } = req.body;
-
-    // Check if files were uploaded and map file paths
-    const imagePaths = req.files ? req.files.map(file => file.path) : [];
-
-    try {
-        // Create a new property in the database
-        const newProperty = await Property.create({
-            ownerId: req.user._id,
-            name,
-            description,
-            address,
-            city,
-            province,
-            zipCode,
-            coordinates,
-            price,
-            type,
-            availableRooms,
-            amenities,
-            status,
-            images: imagePaths
-        });
-
-        await newProperty.save();
-        res.status(201).json({ message: 'Property created successfully', property: newProperty });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!req.user) {
+      return res.status(401).json({ message: 'User not authenticated' });
     }
-};
+  
+    const { name, description, address, city, province, zipCode, price, type, availableRooms, amenities, status } = req.body;
+    const imagePaths = req.files ? req.files.map(file => file.path) : [];
+  
+    try {
+      const newProperty = await Property.create({
+        ownerId: req.user._id,  // Ensure req.user is defined before accessing _id
+        name,
+        description,
+        address,
+        city,
+        province,
+        zipCode,
+        price,
+        type,
+        availableRooms,
+        amenities,
+        status,
+        images: imagePaths
+      });
+  
+      await newProperty.save();
+      res.status(201).json({ message: 'Property created successfully', property: newProperty });
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  };
 
 // Controller to get all properties
 const getAllProperties = async (req, res) => {
