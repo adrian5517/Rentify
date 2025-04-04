@@ -7,18 +7,18 @@ const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
 // Route to create a new property
-router.post('/properties', upload.array('images', 5), createProperty);
+router.post('/', upload.array('images', 5), createProperty);
 
 // Route to get all properties
-router.get('/properties', getAllProperties);
+router.get('/', getAllProperties);
 
 // Route to get a specific property by ID
-router.get('/properties/:id', getPropertyById);
+router.get('/:id', getPropertyById);
 
 // Route to update a property by ID
-router.put('/properties/:id', upload.array('images', 5), updateProperty);
+router.put('/:id', upload.array('images', 5), updateProperty);
 
 // Route to delete a property by ID
-router.delete('/properties/:id', deleteProperty);
+router.delete('/:id', deleteProperty);
 
 module.exports = router;
