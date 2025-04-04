@@ -11,14 +11,14 @@ const {
 const router = express.Router();
 
 // Optional: Middleware to protect routes
-const { protect } = require('../middleware/authMiddleware');
+// const { protect } = require('../middleware/authMiddleware');
 
 // Routes
-router.post('/', protect, createBooking);               // Create a new booking
-router.get('/', protect, getBookings);                  // Get all bookings for the logged-in user
-router.get('/:id', protect, getBookingById);            // Get a single booking by ID
-router.put('/:id', protect, updateBooking);             // Update a booking
-router.patch('/:id/cancel', protect, cancelBooking);    // Cancel a booking (better as PATCH for status update)
-router.delete('/:id', protect, deleteBooking);          // Delete a booking
+router.post('/',  createBooking);               // Create a new booking
+router.get('/',  getBookings);                  // Get all bookings for the logged-in user
+router.get('/:id',  getBookingById);            // Get a single booking by ID
+router.put('/:id',  updateBooking);             // Update a booking
+router.patch('/:id/cancel',  cancelBooking);    // Cancel a booking (better as PATCH for status update)
+router.delete('/:id',  deleteBooking);          // Delete a booking
 
 module.exports = router;
