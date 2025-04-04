@@ -3,7 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cron = require("node-cron");
 const cors = require('cors'); // Optional: for frontend connection
-const { protect } = require('./middleware/authMiddleware');
+// const { protect } = require('./middleware/authMiddleware');
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');

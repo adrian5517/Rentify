@@ -1,17 +1,16 @@
-const { createProperty, getAllProperties, getPropertyById, updateProperty, deleteProperty, uploadImages } = require('../controllers/propertyController');
 const express = require('express');
 const router = express.Router();
 
-// Temporarily remove the auth middleware here
-// const { protect } = require('../middleware/authMiddleware');
+const { registerUser , loginUser , logoutUser , authMiddleware } = require ('../controllers/authController');
 
-// Create property route without auth middleware
-router.post('/', uploadImages, createProperty);
-
-// You can add other routes below...
-router.get('/', getAllProperties);
-router.get('/:id', getPropertyById);
-router.put('/:id', uploadImages, updateProperty);
-router.delete('/:id', deleteProperty);
+router.post('/signup', registerUser);
+router.post('/login', loginUser );
+router.post('/logout', logoutUser);
+router.get('/protected', authMiddleware, (req, res) => {
+    res.status(200).json({message:'Protected route', user:req.user});
+});
 
 module.exports = router;
+
+
+
