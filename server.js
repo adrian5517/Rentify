@@ -33,7 +33,7 @@ if (!process.env.DB_URI || !process.env.PORT || !process.env.JWT_SECRET) {
 
 // Use Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/property',protect , propertyRoutes);
+app.use('/api/property', propertyRoutes);
 app.use('/api/booking', bookingRoutes);
 
 // Connect to MongoDB and Start Server
