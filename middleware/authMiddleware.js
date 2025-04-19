@@ -4,28 +4,36 @@ const User = require('../models/usersModel');
 exports.protect = async (req, res, next) => {
     let token;
 
-    // Check if token exists in Authorization header
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-        try {
-            // Log the Authorization header for debugging
-            console.log("Authorization Header:", req.headers.authorization);
-
-            // Extract token from the Authorization header
+    try {
+        // Check if Authorization header is present and starts with 'Bearer'
+        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+            // Extract token from header
             token = req.headers.authorization.split(' ')[1];
 
-            // Log the extracted token for debugging
-            console.log("Extracted Token:", token);
+            if (process.env.NODE_ENV !== 'production') {
+                console.log("Extracted Token:", token);
+            }
 
-            // Verify the token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);  // Ensure JWT_SECRET is correctly set in .env
-            req.user = await User.findById(decoded.id).select('-password'); // Fetch user from DB and exclude password
-            next();  // Proceed to the next middleware/controller
-        } catch (error) {
-            res.status(401).json({ message: 'Not authorized, token failed' });
+            // Verify token
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            if (!decoded.id) {
+                return res.status(401).json({ message: 'Token is invalid or malformed' });
+            }
+
+            // Fetch user and attach to request object
+            req.user = await User.findById(decoded.id).select('-password');
+
+            if (!req.user) {
+                return res.status(401).json({ message: 'User not found' });
+            }
+
+            next(); // User is authorized, proceed
+        } else {
+            return res.status(401).json({ message: 'Not authorized, token missing' });
         }
-    }
-
-    if (!token) {
-        res.status(401).json({ message: 'Not authorized, no token' });
+    } catch (error) {
+        console.error("Auth middleware error:", error.message);
+        return res.status(401).json({ message: 'Not authorized, token failed' });
     }
 };

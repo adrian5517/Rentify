@@ -21,4 +21,5 @@ router.put('/:id', upload.array('images', 5), updateProperty);
 // Route to delete a property by ID
 router.delete('/:id', deleteProperty);
 
+// router.post('/', authMiddleware, upload.array('images', 5), createProperty);
 module.exports = router;
