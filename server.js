@@ -12,7 +12,7 @@ const { protect } = require('./middleware/authMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
-const userRoutes = require('./routes/userRoutes')
+
 
 
 // Initialize Express App
