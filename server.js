@@ -60,7 +60,7 @@ if (!DB_URI || !PORT || !JWT_SECRET) {
 app.use('/api/auth', authRoutes);
 app.use('/api/property', propertyRoutes); // Should support file upload if needed
 app.use('/api/booking', bookingRoutes);
-app.use('/api/users' , userRoutes);
+
 
 
 
