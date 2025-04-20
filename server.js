@@ -12,8 +12,8 @@ const { protect } = require('./middleware/authMiddleware');
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+const userRoutes = require('./routes/userRoutes')
 
-const wasteNewsRoutes = require('./routes/wasteNewsRoutes')
 
 // Initialize Express App
 const app = express();
@@ -60,7 +60,8 @@ if (!DB_URI || !PORT || !JWT_SECRET) {
 app.use('/api/auth', authRoutes);
 app.use('/api/property', propertyRoutes); // Should support file upload if needed
 app.use('/api/booking', bookingRoutes);
-app.use('/api/wastenews' , wasteNewsRoutes);
+app.use('/api/users' , userRoutes);
+
 
 
 // Example protected route
