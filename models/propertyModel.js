@@ -17,6 +17,17 @@ const propertySchema = new mongoose.Schema({
   },
   postedBy: { type: String, required: true },
   amenities: [{ type: String }],
+  category: {
+    type: String,
+    enum: ['Apartment', 'Condo', 'House', 'Dorm'], 
+  
+  },
+  status: {
+    type: String,
+    enum: ['available', 'rented', 'sold' , 'fully booked'],
+    default: 'available'
+  },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdAt: { type: Date, default: Date.now }
 });
 
