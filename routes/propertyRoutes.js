@@ -1,25 +1,11 @@
 const express = require('express');
-const multer = require('multer');
-const { createProperty, getAllProperties, getPropertyById, updateProperty, deleteProperty } = require('../controllers/propertyController');
 const router = express.Router();
+const propertyController = require('../controllers/propertyController');
 
-// Set up multer for file uploads
-const upload = multer({ dest: 'uploads/' });
+router.get('/', propertyController.getAllProperties);
+router.get('/:id', propertyController.getPropertyById);
+router.post('/', propertyController.createProperty);
+router.put('/:id', propertyController.updateProperty);
+router.delete('/:id', propertyController.deleteProperty);
 
-// Route to create a new property
-router.post('/', upload.array('images', 5), createProperty);
-
-// Route to get all properties
-router.get('/', getAllProperties);
-
-// Route to get a specific property by ID
-router.get('/:id', getPropertyById);
-
-// Route to update a property by ID
-router.put('/:id', upload.array('images', 5), updateProperty);
-
-// Route to delete a property by ID
-router.delete('/:id', deleteProperty);
-
-// router.post('/', authMiddleware, upload.array('images', 5), createProperty);
 module.exports = router;

@@ -1,32 +1,23 @@
 const mongoose = require('mongoose');
 
 const propertySchema = new mongoose.Schema({
-  name: {
-    type: String, // Property name
-    
+  name: { type: String, required: true },
+  description: { type: String },
+  image: { type: String },
+  location: {
+    address: { type: String, required: true },
+    latitude: { type: Number, required: true },
+    longitude: { type: Number, required: true }
   },
-  address: {
-    type: String,  // Property address
-    
+  price: { type: Number, required: true },
+  propertyType: {
+    type: String,
+    enum: ['apartment', 'house', 'condo', 'room', 'other'],
+    default: 'other'
   },
-  price: {
-    type: Number,  // Property price per night
-    
-  },
-  description: {
-    type: String, // Property description
-    
-  },
-  images: [String], // Array of image URLs
-  ownerId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // Reference to the User model (assuming you have a User model) // You can set this to true if every property must have an owner
-     // Owner ID is required
-  },
-}, {
-  timestamps: true, // Automatically add createdAt and updatedAt fields
+  postedBy: { type: String, required: true },
+  amenities: [{ type: String }],
+  createdAt: { type: Date, default: Date.now }
 });
 
-const Property = mongoose.model('Property', propertySchema);
-
-module.exports = Property;
+module.exports = mongoose.model('Property', propertySchema);
