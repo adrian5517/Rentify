@@ -17,11 +17,6 @@ const propertySchema = new mongoose.Schema({
   },
   postedBy: { type: String, required: true },
   amenities: [{ type: String }],
-  category: {
-    type: String,
-    enum: ['Apartment', 'Condo', 'House', 'Dorm'], 
-  
-  },
   status: {
     type: String,
     enum: ['available', 'rented', 'sold' , 'fully booked'],
