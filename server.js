@@ -8,10 +8,14 @@ const fs = require('fs');
 const path = require('path');
 const { protect } = require('./middleware/authMiddleware');
 
+
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
+
+
+
 
 
 
@@ -57,9 +61,9 @@ if (!DB_URI || !PORT || !JWT_SECRET) {
 }
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/property', propertyRoutes); // Should support file upload if needed
+app.use('/api/auth', authRoutes);// Should support file upload if needed
 app.use('/api/booking', bookingRoutes);
+app.use('/api/properties', propertyRoutes);
 
 
 
