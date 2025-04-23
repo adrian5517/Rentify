@@ -10,7 +10,7 @@ exports.getAllProperties = async (req, res) => {
   }
 };
 
-// Get single property
+// Get a single property
 exports.getPropertyById = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
@@ -21,7 +21,7 @@ exports.getPropertyById = async (req, res) => {
   }
 };
 
-// Create a new property
+// Create a single property
 exports.createProperty = async (req, res) => {
   try {
     const newProperty = new Property(req.body);
@@ -32,10 +32,29 @@ exports.createProperty = async (req, res) => {
   }
 };
 
+// Create multiple properties (Bulk POST)
+exports.createBulkProperties = async (req, res) => {
+  try {
+    if (!Array.isArray(req.body)) {
+      return res.status(400).json({ message: 'Expected an array of properties' });
+    }
+
+    const savedProperties = await Property.insertMany(req.body);
+    res.status(201).json({
+      message: `${savedProperties.length} properties created successfully.`,
+      data: savedProperties,
+    });
+  } catch (error) {
+    console.error('Bulk insert error:', error);
+    res.status(500).json({ message: 'Server Error during bulk insert' });
+  }
+};
+
 // Update a property
 exports.updateProperty = async (req, res) => {
   try {
     const updatedProperty = await Property.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedProperty) return res.status(404).json({ message: 'Property not found' });
     res.json(updatedProperty);
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
@@ -45,8 +64,9 @@ exports.updateProperty = async (req, res) => {
 // Delete a property
 exports.deleteProperty = async (req, res) => {
   try {
-    await Property.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Property deleted' });
+    const deletedProperty = await Property.findByIdAndDelete(req.params.id);
+    if (!deletedProperty) return res.status(404).json({ message: 'Property not found' });
+    res.json({ message: 'Property deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error' });
   }
