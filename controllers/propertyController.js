@@ -1,49 +1,13 @@
 const Property = require('../models/propertyModel');
-const KMeans = require('ml-kmeans');
 
-// Get all properties with clustering
+// Get all properties
 exports.getAllProperties = async (req, res) => {
   try {
     const properties = await Property.find();
+    res.json(properties);
 
-    // Prepare features for clustering
-    const featureSet = properties
-      .map(p => {
-        if (
-          p.price != null &&
-          p.location &&
-          p.location.latitude != null &&
-          p.location.longitude != null
-        ) {
-          return [
-            parseFloat(p.price),
-            parseFloat(p.location.latitude),
-            parseFloat(p.location.longitude),
-          ];
-        }
-        return null;
-      })
-      .filter(v => v !== null);
-
-    // If valid features found, apply clustering
-    let clusters = [];
-    if (featureSet.length > 0) {
-      const k = 3; // Number of clusters
-      const kmeansResult = KMeans(featureSet, k);
-      clusters = kmeansResult.clusters;
-    }
-
-    // Attach cluster info along with name, description, and other details to each property
-    const clusteredProperties = properties.map((property, index) => ({
-      ...property.toObject(),
-      cluster: clusters[index] !== undefined ? clusters[index] : -1,
-      name: property.name,
-      description: property.description,
-    }));
-
-    res.json(clusteredProperties);
+    
   } catch (error) {
-    console.error('Clustering error:', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
