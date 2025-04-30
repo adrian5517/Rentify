@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const propertySchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String },
-  image: { type: String },
+  images: [{ type: String }], 
   location: {
     address: { type: String, required: true },
     latitude: { type: Number, required: true },
@@ -19,7 +19,7 @@ const propertySchema = new mongoose.Schema({
   amenities: [{ type: String }],
   status: {
     type: String,
-    enum: ['available', 'rented', 'sold' , 'fully booked'],
+    enum: ['available', 'rented', 'sold', 'fully booked'],
     default: 'available'
   },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
