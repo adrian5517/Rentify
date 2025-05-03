@@ -25,7 +25,8 @@ const upload = multer({ storage });
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(uploadDir)); // Serve images from uploads folder
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');

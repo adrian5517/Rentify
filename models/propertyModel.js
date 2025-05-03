@@ -12,7 +12,7 @@ const propertySchema = new mongoose.Schema({
   price: { type: Number },
   propertyType: {
     type: String,
-    enum: ['apartment', 'house', 'condo', 'room', 'other'],
+    enum: ['apartment', 'house', 'condo', 'room', 'boarding house', 'other'],
     default: 'other'
   },
   postedBy: {
@@ -22,7 +22,7 @@ const propertySchema = new mongoose.Schema({
   amenities: [{ type: String }],
   status: {
     type: String,
-    enum: ['available', 'rented', 'sold', 'fully booked'],
+    enum: ['available', 'For rent', 'For sale', 'fully booked', ],
     default: 'available'
   },
   createdBy: {
