@@ -42,18 +42,37 @@ exports.createProperty = async (req, res) => {
       createdBy
     } = req.body;
 
+    // Check for required fields
     if (!title || !price || !latitude || !longitude) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    const parsedAmenities = JSON.parse(amenities);
+    // Parse amenities and check if it's a valid JSON
+    let parsedAmenities = [];
+    try {
+      parsedAmenities = JSON.parse(amenities);
+    } catch (err) {
+      return res.status(400).json({ message: 'Invalid amenities format' });
+    }
+
+    // Validate amenities is an array
+    if (!Array.isArray(parsedAmenities)) {
+      return res.status(400).json({ message: 'Amenities should be an array' });
+    }
 
     const imagePaths = [];
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
+        // Validate image file type (optional but recommended)
+        const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        if (!validImageTypes.includes(file.mimetype)) {
+          return res.status(400).json({ message: 'Invalid file type. Only PNG/JPG/JPEG are allowed' });
+        }
+
         const filename = `${Date.now()}-${file.originalname.split('.')[0]}.png`;
         const outputPath = path.join(uploadDir, filename);
 
+        // Resize and save image using sharp
         await sharp(file.buffer)
           .resize(800)
           .png()
@@ -76,9 +95,11 @@ exports.createProperty = async (req, res) => {
       images: imagePaths
     });
 
+    // Save property to the database
     const saved = await property.save();
     res.status(201).json(saved);
   } catch (error) {
+    console.error(error); // Add some logging for server errors
     res.status(500).json({ message: 'Server error', error });
   }
 };
