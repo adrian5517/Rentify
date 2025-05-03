@@ -36,7 +36,6 @@ const { protect } = require('./middleware/authMiddleware');
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/booking', bookingRoutes);
 app.use('/api/properties', propertyRoutes);
 
 // Example protected route
