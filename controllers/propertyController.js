@@ -76,7 +76,7 @@ exports.createProperty = async (req, res) => {
       price,
       propertyType,
       postedBy,
-      amenities: amenitiesArray,
+      amenities: Array.isArray(amenities) ? amenities : [amenities],
       status,
       createdBy,
       images: imagePaths
