@@ -51,22 +51,26 @@ exports.createProperty = async (req, res) => {
     }
 
     const imagePaths = [];
+
     if (req.files && req.files.length > 0) {
       const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
       for (const file of req.files) {
         if (!validImageTypes.includes(file.mimetype)) continue;
 
-        const filename = `${Date.now()}-${file.originalname.split('.')[0]}.png`;
+        const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
         const outputPath = path.join(uploadDir, filename);
 
-        await sharp(file.buffer)
-          .resize(800)
-          .png()
-          .toFile(outputPath);
+    // Save image using Sharp
+    await sharp(file.buffer)
+      .resize({ width: 800 })
+      .toFormat('jpeg') // Convert to jpeg to ensure compatibility
+      .jpeg({ quality: 90 })
+      .toFile(outputPath);
 
-        imagePaths.push(`/uploads/${filename}`);
-      }
-    }
+    imagePaths.push(`/uploads/${filename}`);
+  }
+}
+
 
     const property = new Property({
       name,
