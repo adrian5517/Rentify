@@ -1,142 +1,104 @@
 const Property = require('../models/propertyModel');
 const sharp = require('sharp');
-const path = require('path');
 const fs = require('fs');
-const multer = require('multer');
+const path = require('path');
 
-// Setup Multer Storage Configuration
-const storage = multer.memoryStorage(); // Use memory storage to process images before saving
-const upload = multer({ storage: storage }).array('images'); // Assuming "images" is the field name in the form
+// Create directory if not exists
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
-// GET ALL PROPERTIES
 exports.getAllProperties = async (req, res) => {
   try {
     const properties = await Property.find();
     res.json(properties);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server error', error });
   }
 };
 
-// GET SINGLE PROPERTY
 exports.getPropertyById = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
-    if (!property) return res.status(404).json({ message: 'Property Not Found' });
+    if (!property) return res.status(404).json({ message: 'Property not found' });
     res.json(property);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server error', error });
   }
 };
 
-// CREATE NEW PROPERTY WITH IMAGE PROCESSING
 exports.createProperty = async (req, res) => {
-  // Use Multer to handle file uploads
-  upload(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({ message: 'Error uploading files', error: err.message });
+  try {
+    const {
+      title,
+      description,
+      price,
+      latitude,
+      longitude,
+      address = '',
+      propertyType = 'other',
+      postedBy = 'Anonymous',
+      amenities = '[]',
+      status = 'available',
+      createdBy
+    } = req.body;
+
+    if (!title || !price || !latitude || !longitude) {
+      return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    try {
-      const {
-        name,
-        description,
-        location,
-        price,
-        propertyType,
-        postedBy,
-        amenities,
-        status,
-        createdBy
-      } = req.body;
+    const parsedAmenities = JSON.parse(amenities);
 
-      // Input validation
-      if (!name || !description || !location || !price || !propertyType || !postedBy || !status || !createdBy) {
-        return res.status(400).json({ message: 'Missing required fields' });
+    const imagePaths = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const filename = `${Date.now()}-${file.originalname.split('.')[0]}.png`;
+        const outputPath = path.join(uploadDir, filename);
+
+        await sharp(file.buffer)
+          .resize(800)
+          .png()
+          .toFile(outputPath);
+
+        imagePaths.push(`/uploads/${filename}`);
       }
-
-      const uploadDir = path.join(__dirname, '..', 'uploads');
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
-
-      const imagePaths = [];
-
-      // Check if files exist and process images
-      if (req.files && req.files.length > 0) {
-        for (const file of req.files) {
-          // Validate file type (e.g., only allow images)
-          if (!file.mimetype.startsWith('image/')) {
-            return res.status(400).json({ message: 'Only image files are allowed' });
-          }
-
-          const outputFilename = `${Date.now()}-${file.originalname.split('.')[0]}.png`;
-          const outputPath = path.join(uploadDir, outputFilename);
-
-          await sharp(file.buffer)
-            .png()
-            .toFile(outputPath);
-
-          imagePaths.push(`/uploads/${outputFilename}`);
-        }
-      }
-
-      // Parse location and amenities as JSON
-      const parsedLocation = JSON.parse(location);
-      const parsedAmenities = amenities ? JSON.parse(amenities) : [];
-
-      // Create new property
-      const newProperty = new Property({
-        name,
-        description,
-        location: parsedLocation,
-        price,
-        propertyType,
-        postedBy,
-        amenities: parsedAmenities,
-        status,
-        createdBy,
-        images: imagePaths
-      });
-
-      // Save property to database
-      const savedProperty = await newProperty.save();
-      res.status(201).json(savedProperty);
-    } catch (error) {
-      console.error(error);
-      // Specific error message for JSON parsing issues
-      if (error instanceof SyntaxError) {
-        return res.status(400).json({ message: 'Invalid JSON format' });
-      }
-      res.status(500).json({ message: 'Server Error during property creation' });
     }
-  });
+
+    const property = new Property({
+      name: title,
+      description,
+      location: { address, latitude, longitude },
+      price,
+      propertyType,
+      postedBy,
+      amenities: parsedAmenities,
+      status,
+      createdBy,
+      images: imagePaths
+    });
+
+    const saved = await property.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
 };
 
-// UPDATE PROPERTY
 exports.updateProperty = async (req, res) => {
   try {
-    const updatedProperty = await Property.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    if (!updatedProperty) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-    res.json(updatedProperty);
+    const updated = await Property.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updated) return res.status(404).json({ message: 'Property not found' });
+    res.json(updated);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server error', error });
   }
 };
 
-// DELETE PROPERTY
 exports.deleteProperty = async (req, res) => {
   try {
-    const deletedProperty = await Property.findByIdAndDelete(req.params.id);
-    if (!deletedProperty) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-    res.json({ message: 'Property deleted' });
+    const deleted = await Property.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: 'Property not found' });
+    res.json({ message: 'Property deleted successfully' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server error', error });
   }
 };

@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 const propertySchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String },
-  images: [{ type: String }], 
+  images: [{ type: String }],
   location: {
-    address: { type: String, required: true },
+    address: { type: String },
     latitude: { type: Number, required: true },
     longitude: { type: Number, required: true }
   },
