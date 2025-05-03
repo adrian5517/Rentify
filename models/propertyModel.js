@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const propertySchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String,  },
   description: { type: String },
   images: [{ type: String }],
   location: {
@@ -15,7 +15,7 @@ const propertySchema = new mongoose.Schema({
     enum: ['apartment', 'house', 'condo', 'room', 'other'],
     default: 'other'
   },
-  postedBy: { type: String, required: true },
+  postedBy: { type: String,  },
   amenities: [{ type: String }],
   status: {
     type: String,
