@@ -37,18 +37,13 @@ exports.createProperty = async (req, res) => {
       address ,
       propertyType = 'other',
       postedBy,
-      amenities ,
+      amenities,
       status = 'available',
       createdBy
     } = req.body;
 
-    // Parse amenities
-    let parsedAmenities = [];
-    try {
-      parsedAmenities = JSON.parse(amenities);
-    } catch {
-      parsedAmenities = [];
-    }
+    
+    
 
     const imagePaths = [];
 
@@ -79,7 +74,7 @@ exports.createProperty = async (req, res) => {
       price,
       propertyType,
       postedBy,
-      amenities: parsedAmenities,
+      amenities,
       status,
       createdBy,
       images: imagePaths
