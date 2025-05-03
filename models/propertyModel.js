@@ -1,62 +1,37 @@
 const mongoose = require('mongoose');
 
 const propertySchema = new mongoose.Schema({
-  name: { 
-    type: String, 
-    required: true  // Set name as required
-  },
-  description: { 
-    type: String,
-    required: true // Set description as required
-  },
-  images: [{ 
-    type: String, 
-    required: true  // Ensure at least one image is provided
-  }],
+  name: { type: String },
+  description: { type: String },
+  images: [{ type: String }],
   location: {
-    address: { 
-      type: String, 
-      required: true  // Make address required
-    },
-    latitude: { 
-      type: Number, 
-      required: true  // Ensure latitude is provided
-    },
-    longitude: { 
-      type: Number, 
-      required: true  // Ensure longitude is provided
-    }
+    address: { type: String },
+    latitude: { type: Number },
+    longitude: { type: Number }
   },
-  price: { 
-    type: Number, 
-    required: true  // Make price a required field
-  },
+  price: { type: Number },
   propertyType: {
     type: String,
     enum: ['apartment', 'house', 'condo', 'room', 'other'],
     default: 'other'
   },
-  postedBy: { 
-    type: String,
-    required: true  // Ensure postedBy is provided (optional or required depending on your app)
+  postedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
-  amenities: [{ 
-    type: String, 
-    required: true  // At least one amenity should be included
-  }],
+  amenities: [{ type: String }],
   status: {
     type: String,
     enum: ['available', 'rented', 'sold', 'fully booked'],
     default: 'available'
   },
-  createdBy: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true  // Ensure createdBy is always set (referencing the user who created the listing)
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
-  createdAt: { 
-    type: Date, 
-    default: Date.now 
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
 });
 
