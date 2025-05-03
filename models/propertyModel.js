@@ -12,17 +12,17 @@ const propertySchema = new mongoose.Schema({
   price: { type: Number },
   propertyType: {
     type: String,
-    enum: ['apartment', 'house', 'condo', 'room', 'dorm','boarding house', 'other'],
+    enum: ['apartment', 'house', 'condo', 'room', 'dorm', 'boarding house', 'other'],
     default: 'other'
   },
   postedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
-  amenities: { type: String },
+  amenities: [{ type: String }], // ✅ changed from String to Array of Strings
   status: {
     type: String,
-    enum: ['available', 'For rent', 'For sale', 'fully booked', ],
+    enum: ['available', 'For rent', 'For sale', 'fully booked'],
     default: 'available'
   },
   createdBy: {

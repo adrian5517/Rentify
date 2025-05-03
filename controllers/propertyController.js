@@ -34,16 +34,13 @@ exports.createProperty = async (req, res) => {
       price,
       latitude,
       longitude,
-      address ,
+      address,
       propertyType = 'other',
       postedBy,
       amenities,
       status = 'available',
       createdBy
     } = req.body;
-
-    
-    
 
     const imagePaths = [];
 
@@ -55,17 +52,22 @@ exports.createProperty = async (req, res) => {
         const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
         const outputPath = path.join(uploadDir, filename);
 
-    // Save image using Sharp
-    await sharp(file.buffer)
-      .resize({ width: 800 })
-      .toFormat('jpeg') // Convert to jpeg to ensure compatibility
-      .jpeg({ quality: 90 })
-      .toFile(outputPath);
+        await sharp(file.buffer)
+          .resize({ width: 800 })
+          .toFormat('jpeg')
+          .jpeg({ quality: 90 })
+          .toFile(outputPath);
 
-    imagePaths.push(`/uploads/${filename}`);
-  }
-}
+        imagePaths.push(`/uploads/${filename}`);
+      }
+    }
 
+    // Convert amenities to array if necessary
+    const amenitiesArray = Array.isArray(amenities)
+      ? amenities
+      : typeof amenities === 'string'
+      ? [amenities]
+      : [];
 
     const property = new Property({
       name,
@@ -74,7 +76,7 @@ exports.createProperty = async (req, res) => {
       price,
       propertyType,
       postedBy,
-      amenities,
+      amenities: amenitiesArray,
       status,
       createdBy,
       images: imagePaths
