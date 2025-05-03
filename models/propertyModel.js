@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const propertySchema = new mongoose.Schema({
   name: { type: String },
-  description: { type: String },
+  cpNumber: { type: String },
   images: [{ type: String }],
   location: {
     address: { type: String },

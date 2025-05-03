@@ -30,7 +30,7 @@ exports.createProperty = async (req, res) => {
   try {
     const {
       name,
-      description,
+      cpNumber,
       price,
       latitude,
       longitude,
@@ -71,7 +71,7 @@ exports.createProperty = async (req, res) => {
 
     const property = new Property({
       name,
-      description,
+      cpNumber,
       location: { address, latitude, longitude },
       price,
       propertyType,
