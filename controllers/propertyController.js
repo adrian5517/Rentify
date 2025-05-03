@@ -34,7 +34,7 @@ exports.createProperty = async (req, res) => {
       price,
       latitude,
       longitude,
-      address = ,
+      address ,
       propertyType = 'other',
       postedBy,
       amenities ,
