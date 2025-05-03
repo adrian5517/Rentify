@@ -1,13 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const propertyController = require('../controllers/propertyController');
 const upload = require('../middleware/uploadMiddleware');
+const controller = require('../controllers/propertyController');
 
-// Routes
-router.get('/', propertyController.getAllProperties);
-router.get('/:id', propertyController.getPropertyById);
-router.post('/', upload.array('images', 5), propertyController.createProperty); // max 5 images
-router.put('/:id', propertyController.updateProperty);
-router.delete('/:id', propertyController.deleteProperty);
+router.get('/', controller.getAllProperties);
+router.get('/:id', controller.getPropertyById);
+router.post('/', upload.array('images', 5), controller.createProperty);
+router.put('/:id', controller.updateProperty);
+router.delete('/:id', controller.deleteProperty);
 
 module.exports = router;
