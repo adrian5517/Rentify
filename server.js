@@ -34,7 +34,7 @@ app.get('/profile', protect, (req, res) => {
 });
 
 // Cloudinary upload endpoint
-app.post('/upload', upload.single('propertyImage'), async (req, res) => {
+app.post('/upload', upload.array('propertyImage' , 5), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
