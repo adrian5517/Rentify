@@ -1,29 +1,38 @@
 const mongoose = require('mongoose');
 
 const propertySchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String },
   description: { type: String },
-  images: [{ type: String }], 
+  images: [{ type: String }],
   location: {
-    address: { type: String, required: true },
-    latitude: { type: Number, required: true },
-    longitude: { type: Number, required: true }
+    address: { type: String },
+    latitude: { type: Number },
+    longitude: { type: Number }
   },
-  price: { type: Number, required: true },
+  price: { type: Number },
   propertyType: {
     type: String,
-    enum: ['apartment', 'house', 'condo', 'room', 'other'],
+    enum: ['apartment', 'house', 'condo', 'room', 'dorm', 'boarding house', 'other'],
     default: 'other'
   },
-  postedBy: { type: String, required: true },
-  amenities: [{ type: String }],
+  postedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  amenities: [{ type: String }], // ✅ changed from String to Array of Strings
   status: {
     type: String,
-    enum: ['available', 'rented', 'sold', 'fully booked'],
+    enum: ['available', 'For rent', 'For sale', 'fully booked'],
     default: 'available'
   },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  createdAt: { type: Date, default: Date.now }
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
 module.exports = mongoose.model('Property', propertySchema);
