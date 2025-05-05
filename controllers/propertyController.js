@@ -2,6 +2,7 @@ const Property = require('../models/propertyModel');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
+const cloudinary = require('../cloudinary');
 
 // Create directory if not exists
 const uploadDir = path.join(__dirname, '..', 'uploads');
@@ -42,27 +43,18 @@ exports.createProperty = async (req, res) => {
       createdBy
     } = req.body;
 
-    const imagePaths = [];
+    const imageUrls = [];
 
     if (req.files && req.files.length > 0) {
-      const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg'];
       for (const file of req.files) {
-        if (!validImageTypes.includes(file.mimetype)) continue;
-
-        const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
-        const outputPath = path.join(uploadDir, filename);
-
-        await sharp(file.buffer)
-          .resize({ width: 800 })
-          .toFormat('jpeg')
-          .jpeg({ quality: 90 })
-          .toFile(outputPath);
-
-        imagePaths.push(`/uploads/${filename}`);
+        const base64Str = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        const uploadResult = await cloudinary.uploader.upload(base64Str, {
+          folder: 'properties'
+        });
+        imageUrls.push(uploadResult.secure_url);
       }
     }
 
-    // Convert amenities to array if necessary
     const amenitiesArray = Array.isArray(amenities)
       ? amenities
       : typeof amenities === 'string'
@@ -76,10 +68,10 @@ exports.createProperty = async (req, res) => {
       price,
       propertyType,
       postedBy,
-      amenities: Array.isArray(amenities) ? amenities : [amenities],
+      amenities: amenitiesArray,
       status,
       createdBy,
-      images: imagePaths
+      images: imageUrls
     });
 
     const saved = await property.save();
