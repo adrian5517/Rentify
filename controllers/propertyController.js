@@ -33,7 +33,6 @@ exports.getPropertyById = async (req, res) => {
 
 // CREATE NEW PROPERTY WITH IMAGE PROCESSING
 exports.createProperty = async (req, res) => {
-  // Use Multer to handle file uploads
   upload(req, res, async (err) => {
     if (err) {
       return res.status(400).json({ message: 'Error uploading files', error: err.message });
@@ -41,31 +40,45 @@ exports.createProperty = async (req, res) => {
 
     try {
       const {
-        name,
+        title,
         description,
-        location,
         price,
-        propertyType,
-        postedBy,
-        amenities,
-        status,
-        createdBy
+        latitude,
+        longitude,
+        propertyType = 'Residential',   // default value
+        postedBy = 'Anonymous',
+        amenities = '[]',              // expecting JSON string
+        status = 'Available',
+        createdBy = 'System'
       } = req.body;
 
-      // Input validation
-      if (!name || !description || !location || !price || !propertyType || !postedBy || !status || !createdBy) {
+      // Basic validation
+      if (!title || !description || !price || !latitude || !longitude) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
+      // Parse location from latitude & longitude
+      const location = {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+      };
+
+      // Parse amenities
+      let parsedAmenities = [];
+      try {
+        parsedAmenities = JSON.parse(amenities);
+      } catch (e) {
+        return res.status(400).json({ message: 'Invalid amenities format. Must be a JSON array.' });
+      }
+
+      // Save images
       const uploadDir = path.join(__dirname, '..', 'uploads');
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
       const imagePaths = [];
 
-      // Check if files exist and process images
       if (req.files && req.files.length > 0) {
         for (const file of req.files) {
-          // Validate file type (e.g., only allow images)
           if (!file.mimetype.startsWith('image/')) {
             return res.status(400).json({ message: 'Only image files are allowed' });
           }
@@ -73,45 +86,33 @@ exports.createProperty = async (req, res) => {
           const outputFilename = `${Date.now()}-${file.originalname.split('.')[0]}.png`;
           const outputPath = path.join(uploadDir, outputFilename);
 
-          await sharp(file.buffer)
-            .png()
-            .toFile(outputPath);
-
+          await sharp(file.buffer).png().toFile(outputPath);
           imagePaths.push(`/uploads/${outputFilename}`);
         }
       }
 
-      // Parse location and amenities as JSON
-      const parsedLocation = JSON.parse(location);
-      const parsedAmenities = amenities ? JSON.parse(amenities) : [];
-
-      // Create new property
       const newProperty = new Property({
-        name,
+        name: title,
         description,
-        location: parsedLocation,
-        price,
+        location,
+        price: parseFloat(price),
         propertyType,
         postedBy,
         amenities: parsedAmenities,
         status,
         createdBy,
-        images: imagePaths
+        images: imagePaths,
       });
 
-      // Save property to database
       const savedProperty = await newProperty.save();
       res.status(201).json(savedProperty);
     } catch (error) {
-      console.error(error);
-      // Specific error message for JSON parsing issues
-      if (error instanceof SyntaxError) {
-        return res.status(400).json({ message: 'Invalid JSON format' });
-      }
+      console.error('Create Property Error:', error);
       res.status(500).json({ message: 'Server Error during property creation' });
     }
   });
 };
+
 
 // UPDATE PROPERTY
 exports.updateProperty = async (req, res) => {
