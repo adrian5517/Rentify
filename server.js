@@ -20,13 +20,13 @@ app.use(express.urlencoded({ extended: true }));
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
+
 const { protect } = require('./middleware/authMiddleware');
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
-app.use('/api/bookings', bookingRoutes); // Added missing booking routes
+ // Added missing booking routes
 
 // Example protected route
 app.get('/profile', protect, (req, res) => {
