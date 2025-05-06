@@ -26,7 +26,7 @@ const { protect } = require('./middleware/authMiddleware');
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
- // Added missing booking routes
+
 
 // Example protected route
 app.get('/profile', protect, (req, res) => {
