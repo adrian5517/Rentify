@@ -4,6 +4,10 @@ const mongoose = require('mongoose');
 const cron = require('node-cron');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
+const messageRoute = require('./routes/messageRoutes');
+const Message = require('./models/messageModel');
 
 // Cloudinary setup
 const cloudinary = require('./cloudinary');
@@ -11,11 +15,20 @@ const upload = require('./middleware/uploadMiddleware'); // uses memoryStorage
 
 // Initialize Express app
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server,{
+  cors: { origin: '*'}
+})
+
+// Store online users
+const onlineUsers = new Map();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
@@ -26,6 +39,7 @@ const { protect } = require('./middleware/authMiddleware');
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
+app.use("/api/messages", messageRoute);
 
 
 // Example protected route
@@ -77,10 +91,48 @@ mongoose
   .connect(DB_URI, {})
   .then(() => {
     console.log('✅ Connected to MongoDB');
-    app.listen(PORT, () => {
+    server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
   })
   .catch((err) => {
     console.error('❌ MongoDB connection error:', err);
   });
+
+
+// Socket.io setup
+io.on('connection', (socket)=>{
+  console.log("User connected:", socket.id)
+
+  socket.on('register', (userId) => {
+    onlineUsers.set(userId, socket.id);
+  })
+  socket.on("private-message", async ({senderId, receiverId, text, images})=>{
+    try {
+      const newMessage = await Message.create({
+        sender: senderId,
+        receiver: receiverId,
+        message: text,
+        imageUrls: images || [],
+      })
+
+      const receiverSocketId = onlineUsers.get(receiverId);
+      if(receiverSocketId){
+        io.to(receiverSocketId).emit("private-message", newMessage)
+      }
+      
+    } catch (error) {
+      console.error("Error handling private-message:", error);
+    }
+  })
+
+  socket.on("disconnect",()=>{
+    console.log("User disconnected:", socket.id)
+    for( let [userId , socketId] of onlineUsers){
+      if(socketId === socket.id){
+        onlineUsers.delete(userId);
+        break;
+      }
+    }
+  })
+})

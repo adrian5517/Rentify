@@ -27,6 +27,7 @@
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.10.0",
     "router": "^2.2.0",
-    "sharp": "^0.34.1"
+    "sharp": "^0.34.1",
+    "socket.io": "^4.8.1"
   }
 }
