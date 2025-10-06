@@ -1,6 +1,6 @@
 const express = require('express');
 const multer = require('multer');
-const {getMessages, sendMessage} = require('../controllers/messageController');
+const {getMessages, sendMessage, markMessagesAsRead} = require('../controllers/messageController');
 const Message = require('../models/messageModel');
 
 const router = express.Router();
@@ -13,6 +13,9 @@ router.post('/send', upload.array('images'), sendMessage);
 
 //get Messages
 router.get("/:userId1/:otherUserId", getMessages);
+
+//Mark messages as read
+router.post('/mark-read', markMessagesAsRead);
 
 //Delete Message
 router.delete("/:id", async (req, res) => {

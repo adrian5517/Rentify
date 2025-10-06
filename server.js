@@ -106,7 +106,25 @@ io.on('connection', (socket)=>{
 
   socket.on('register', (userId) => {
     onlineUsers.set(userId, socket.id);
+    console.log(`User ${userId} registered with socket ${socket.id}`);
   })
+
+  // Typing indicator - user starts typing
+  socket.on('typing-start', ({ senderId, receiverId }) => {
+    const receiverSocketId = onlineUsers.get(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('typing-start', { senderId });
+    }
+  });
+
+  // Typing indicator - user stops typing
+  socket.on('typing-stop', ({ senderId, receiverId }) => {
+    const receiverSocketId = onlineUsers.get(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('typing-stop', { senderId });
+    }
+  });
+
   socket.on("private-message", async ({senderId, receiverId, text, images})=>{
     try {
       const newMessage = await Message.create({
@@ -125,6 +143,34 @@ io.on('connection', (socket)=>{
       console.error("Error handling private-message:", error);
     }
   })
+
+  // Mark messages as read
+  socket.on('mark-as-read', async ({ userId, otherUserId }) => {
+    try {
+      // Update messages in database
+      const result = await Message.updateMany(
+        {
+          sender: otherUserId,
+          receiver: userId,
+          read: false
+        },
+        {
+          $set: { read: true }
+        }
+      );
+
+      // Notify the sender that their messages have been read
+      const senderSocketId = onlineUsers.get(otherUserId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit('messages-read', { 
+          readBy: userId, 
+          count: result.modifiedCount 
+        });
+      }
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+    }
+  });
 
   socket.on("disconnect",()=>{
     console.log("User disconnected:", socket.id)
