@@ -79,9 +79,58 @@ const logoutUser = async (req, res) => {
     }
 };
 
+const getUsers = async (req, res) => {
+    try {
+        const { search, role, limit = 50, page = 1 } = req.query;
+        
+        // Build query object
+        const query = {};
+        
+        // Search filter - search in username, email, or fullName
+        if (search) {
+            query.$or = [
+                { username: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } },
+                { fullName: { $regex: search, $options: 'i' } }
+            ];
+        }
+        
+        // Role filter
+        if (role) {
+            query.role = role;
+        }
+        
+        // Calculate pagination
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        
+        // Fetch users with pagination
+        const users = await User.find(query)
+            .select('-password') // Exclude password field
+            .limit(parseInt(limit))
+            .skip(skip)
+            .sort({ createdAt: -1 });
+        
+        // Get total count for pagination
+        const totalUsers = await User.countDocuments(query);
+        
+        res.status(200).json({
+            users,
+            pagination: {
+                total: totalUsers,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(totalUsers / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching users', error: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     logoutUser,
-    authMiddleware
+    authMiddleware,
+    getUsers
 };

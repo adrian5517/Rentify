@@ -56,3 +56,30 @@ exports.getMessages = async (req , res)=>{
     }
 }
 
+exports.markMessagesAsRead = async (req, res) => {
+    try {
+        const { userId, otherUserId } = req.body;
+
+        // Mark all messages from otherUserId to userId as read
+        const result = await Message.updateMany(
+            {
+                sender: otherUserId,
+                receiver: userId,
+                read: false
+            },
+            {
+                $set: { read: true }
+            }
+        );
+
+        res.status(200).json({ 
+            message: 'Messages marked as read',
+            modifiedCount: result.modifiedCount
+        });
+    } catch (error) {
+        console.error("Error marking messages as read:", error);
+        res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+}
+
+
