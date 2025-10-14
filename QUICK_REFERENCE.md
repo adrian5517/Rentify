@@ -1,4 +1,12 @@
-# Quick Reference - New Features
+# 🚀 Quick API Reference - Rentify Backend
+
+## Base URL
+```
+Production: https://rentify-server-ge0f.onrender.com
+Local: http://localhost:10000
+```
+
+---
 
 ## 🎯 Quick Commands
 
@@ -6,6 +14,13 @@
 ```bash
 node seedUsers.js
 ```
+
+### Start Server
+```bash
+npm run dev
+```
+
+---
 
 ## 📡 API Endpoints
 
