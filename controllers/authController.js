@@ -129,7 +129,6 @@ const logoutUser = async (req, res) => {
     }
 };
 
-<<<<<<< HEAD
 const uploadProfilePicture = async (req, res) => {
     try {
         const { userId, imageUrl } = req.body;
@@ -279,98 +278,19 @@ const getAllUsers = async (req, res) => {
         res.status(200).json({ 
             count: users.length,
             users 
-=======
-const getUsers = async (req, res) => {
-    try {
-        const { search, role, limit = 50, page = 1 } = req.query;
-        
-        // Build query object
-        const query = {};
-        
-        // Search filter - search in username, email, or fullName
-        if (search) {
-            query.$or = [
-                { username: { $regex: search, $options: 'i' } },
-                { email: { $regex: search, $options: 'i' } },
-                { fullName: { $regex: search, $options: 'i' } }
-            ];
-        }
-        
-        // Role filter
-        if (role) {
-            query.role = role;
-        }
-        
-        // Calculate pagination
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        
-        // Fetch users with pagination
-        const users = await User.find(query)
-            .select('-password') // Exclude password field
-            .limit(parseInt(limit))
-            .skip(skip)
-            .sort({ createdAt: -1 });
-        
-        // Get total count for pagination
-        const totalUsers = await User.countDocuments(query);
-        
-        res.status(200).json({
-            users,
-            pagination: {
-                total: totalUsers,
-                page: parseInt(page),
-                limit: parseInt(limit),
-                totalPages: Math.ceil(totalUsers / parseInt(limit))
-            }
->>>>>>> 29baad58d83b5d4ecace2b6c444b4247a6f9b98e
         });
     } catch (error) {
         res.status(500).json({ message: 'Error fetching users', error: error.message });
     }
 };
 
-<<<<<<< HEAD
-const testPassword = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
-        }
-
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found with this email' });
-        }
-
-        const isMatch = await user.comparePassword(password);
-
-        res.status(200).json({
-            message: 'Password test complete',
-            email: email,
-            passwordMatch: isMatch,
-            userExists: true
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Error testing password', error: error.message });
-    }
-};
-
-=======
->>>>>>> 29baad58d83b5d4ecace2b6c444b4247a6f9b98e
 module.exports = {
     registerUser,
     loginUser,
     logoutUser,
     authMiddleware,
-<<<<<<< HEAD
     uploadProfilePicture,
     updateProfile,
     getUserById,
-    getAllUsers,
-    testPassword
-=======
-    getUsers
->>>>>>> 29baad58d83b5d4ecace2b6c444b4247a6f9b98e
+    getAllUsers
 };
