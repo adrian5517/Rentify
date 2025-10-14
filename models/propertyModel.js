@@ -25,6 +25,13 @@ const propertySchema = new mongoose.Schema({
     enum: ['available', 'For rent', 'For sale', 'fully booked'],
     default: 'available'
   },
+  rating:{
+    type: Number,
+    min: 0,
+    max: 5,
+    default: 0
+  },
+  phoneNumber:{ type: String },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
