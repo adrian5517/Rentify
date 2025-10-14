@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
     phoneNumber: { type: String },
     profilePicture: { type: String,default:""},
     address: { type: String },
+    bio: { type: String },
     role: { type: String, enum: ['user', 'admin', 'renter'], default: 'user' },
 }, { timestamps: true });
 

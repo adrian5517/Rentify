@@ -131,10 +131,18 @@ const logoutUser = async (req, res) => {
 
 const uploadProfilePicture = async (req, res) => {
     try {
-        const { userId, imageUrl } = req.body;
+        const userId = req.params.userId;
+        const { imageUrl } = req.body;
 
-        if (!userId || !imageUrl) {
-            return res.status(400).json({ message: 'User ID and image URL are required' });
+        console.log('=== UPLOAD PROFILE PICTURE REQUEST ===');
+        console.log('User ID from params:', userId);
+        console.log('Image URL:', imageUrl);
+
+        if (!imageUrl) {
+            return res.status(400).json({ 
+                success: false,
+                message: 'Image URL is required' 
+            });
         }
 
         const user = await User.findByIdAndUpdate(
@@ -144,38 +152,62 @@ const uploadProfilePicture = async (req, res) => {
         ).select('-password');
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ 
+                success: false,
+                message: 'User not found' 
+            });
         }
 
+        console.log('Profile picture updated successfully');
+
         res.status(200).json({
+            success: true,
             message: 'Profile picture updated successfully',
             user
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error updating profile picture', error: error.message });
+        console.error('Upload profile picture error:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Error updating profile picture', 
+            error: error.message 
+        });
     }
 };
 
 const updateProfile = async (req, res) => {
     try {
-        const { userId, fullName, username, email, address, phoneNumber } = req.body;
+        const userId = req.params.userId;
+        // Support both naming conventions
+        const { 
+            fullName, name,
+            username, 
+            email, 
+            address, location,
+            phoneNumber, phone,
+            bio
+        } = req.body;
 
         console.log('=== UPDATE PROFILE REQUEST ===');
-        console.log('Received userId:', userId);
-        console.log('userId type:', typeof userId);
-        console.log('userId length:', userId?.length);
+        console.log('User ID from params:', userId);
         console.log('Request body:', JSON.stringify(req.body, null, 2));
 
         if (!userId) {
             console.log('ERROR: userId is missing');
-            return res.status(400).json({ message: 'User ID is required' });
+            return res.status(400).json({ 
+                success: false,
+                message: 'User ID is required' 
+            });
         }
 
         // Check if userId is a valid ObjectId format
         const mongoose = require('mongoose');
         if (!mongoose.Types.ObjectId.isValid(userId)) {
             console.log('ERROR: Invalid userId format');
-            return res.status(400).json({ message: 'Invalid User ID format' });
+            return res.status(400).json({ 
+                success: false,
+                message: 'Invalid User ID format' 
+            });
         }
 
         // Verify user exists first
@@ -184,16 +216,9 @@ const updateProfile = async (req, res) => {
         
         if (!existingUser) {
             console.log('ERROR: User not found in database');
-            console.log('Searching for user with ID:', userId);
-            
-            // Let's search for all users to help debug
-            const allUsers = await User.find().select('_id username email');
-            console.log('All users in database:', JSON.stringify(allUsers, null, 2));
-            
             return res.status(404).json({ 
-                message: 'User not found',
-                searchedId: userId,
-                hint: 'Please check the user ID. Use GET /api/auth/users to see all users.'
+                success: false,
+                message: 'User not found'
             });
         }
 
@@ -210,7 +235,10 @@ const updateProfile = async (req, res) => {
             const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
             if (existingEmail) {
                 console.log('ERROR: Email already exists');
-                return res.status(400).json({ message: 'Email already exists' });
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Email already exists' 
+                });
             }
         }
 
@@ -219,16 +247,21 @@ const updateProfile = async (req, res) => {
             const existingUsername = await User.findOne({ username, _id: { $ne: userId } });
             if (existingUsername) {
                 console.log('ERROR: Username already exists');
-                return res.status(400).json({ message: 'Username already exists' });
+                return res.status(400).json({ 
+                    success: false,
+                    message: 'Username already exists' 
+                });
             }
         }
 
         const updateData = {};
-        if (fullName !== undefined) updateData.fullName = fullName;
+        // Map both naming conventions to database fields
+        if (fullName !== undefined || name !== undefined) updateData.fullName = fullName || name;
         if (username) updateData.username = username;
         if (email) updateData.email = email;
-        if (address !== undefined) updateData.address = address;
-        if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
+        if (address !== undefined || location !== undefined) updateData.address = address || location;
+        if (phoneNumber !== undefined || phone !== undefined) updateData.phoneNumber = phoneNumber || phone;
+        if (bio !== undefined) updateData.bio = bio;
 
         console.log('Update data to be applied:', JSON.stringify(updateData, null, 2));
 
@@ -242,13 +275,18 @@ const updateProfile = async (req, res) => {
         console.log('=== UPDATE COMPLETE ===');
 
         res.status(200).json({
+            success: true,
             message: 'Profile updated successfully',
             user
         });
     } catch (error) {
         console.error('=== UPDATE PROFILE ERROR ===');
         console.error('Error:', error);
-        res.status(500).json({ message: 'Error updating profile', error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: 'Error updating profile', 
+            error: error.message 
+        });
     }
 };
 
@@ -257,18 +295,31 @@ const getUserById = async (req, res) => {
         const { userId } = req.params;
 
         if (!userId) {
-            return res.status(400).json({ message: 'User ID is required' });
+            return res.status(400).json({ 
+                success: false,
+                message: 'User ID is required' 
+            });
         }
 
         const user = await User.findById(userId).select('-password');
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ 
+                success: false,
+                message: 'User not found' 
+            });
         }
 
-        res.status(200).json({ user });
+        res.status(200).json({ 
+            success: true,
+            user 
+        });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching user', error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: 'Error fetching user', 
+            error: error.message 
+        });
     }
 };
 
@@ -276,11 +327,16 @@ const getAllUsers = async (req, res) => {
     try {
         const users = await User.find().select('-password');
         res.status(200).json({ 
+            success: true,
             count: users.length,
             users 
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching users', error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: 'Error fetching users', 
+            error: error.message 
+        });
     }
 };
 
