@@ -2,11 +2,17 @@ const express = require('express');
 const router = express.Router();
 const upload = require('../middleware/uploadMiddleware');
 const controller = require('../controllers/propertyController');
+const { protect } = require('../middleware/authMiddleware');
 
+// Public routes
 router.get('/', controller.getAllProperties);
+router.get('/search', controller.searchProperties); // Must be before /:id
+router.get('/user/:userId', controller.getPropertiesByUser);
 router.get('/:id', controller.getPropertyById);
-router.post('/', upload.array('images', 5), controller.createProperty);
-router.put('/:id', controller.updateProperty);
-router.delete('/:id', controller.deleteProperty);
+
+// Protected routes (require authentication)
+router.post('/', protect, upload.array('images', 5), controller.createProperty);
+router.put('/:id', protect, controller.updateProperty);
+router.delete('/:id', protect, controller.deleteProperty);
 
 module.exports = router;
