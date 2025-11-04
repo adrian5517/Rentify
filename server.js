@@ -28,6 +28,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Passport for social auth
+const passport = require('passport');
+require('./config/passport')(passport);
+app.use(passport.initialize());
+
 
 
 // Import Routes
