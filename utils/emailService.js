@@ -1,24 +1,18 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Create transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_APP_PASSWORD
-  }
-});
+// Initialize SendGrid with API key
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Generate 6-digit OTP
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Send OTP email
+// Send OTP email via SendGrid
 const sendOTPEmail = async (email, otp) => {
-  const mailOptions = {
-    from: `Rentify <${process.env.EMAIL_USER}>`,
+  const msg = {
     to: email,
+    from: process.env.SENDGRID_VERIFIED_SENDER || 'noreply@rentify.com',
     subject: 'Rentify - Password Reset OTP',
     html: `
       <!DOCTYPE html>
@@ -68,11 +62,14 @@ const sendOTPEmail = async (email, otp) => {
   };
   
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ OTP email sent:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    await sgMail.send(msg);
+    console.log('✅ OTP email sent via SendGrid to:', email);
+    return { success: true };
   } catch (error) {
-    console.error('❌ Error sending OTP email:', error);
+    console.error('❌ SendGrid error:', error);
+    if (error.response) {
+      console.error('SendGrid response:', error.response.body);
+    }
     throw new Error('Failed to send OTP email');
   }
 };
