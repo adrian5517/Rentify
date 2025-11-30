@@ -1,5 +1,6 @@
 const Message = require('../models/messageModel');
 const cloudinary = require('cloudinary').v2;
+const mongoose = require('mongoose');
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -79,6 +80,59 @@ exports.markMessagesAsRead = async (req, res) => {
     } catch (error) {
         console.error("Error marking messages as read:", error);
         res.status(500).json({ error: "Internal server error", details: error.message });
+    }
+}
+
+// Get conversation summaries for authenticated user
+exports.getConversations = async (req, res) => {
+    try {
+        // Use authenticated user id from protect middleware
+        const userId = new mongoose.Types.ObjectId(req.user && (req.user._id || req.user.id));
+
+        // Pagination params
+        const rawLimit = parseInt(req.query.limit, 10);
+        const rawSkip = parseInt(req.query.skip, 10);
+        const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 50;
+        const skip = Number.isInteger(rawSkip) && rawSkip >= 0 ? rawSkip : 0;
+
+        const pipeline = [
+            { $match: { $or: [ { sender: userId }, { receiver: userId } ] } },
+            { $addFields: { otherUserId: { $cond: [{ $eq: ['$sender', userId] }, '$receiver', '$sender'] } } },
+            { $sort: { createdAt: -1 } },
+            { $group: {
+                _id: '$otherUserId',
+                lastMessage: { $first: '$$ROOT' },
+                unreadCount: { $sum: { $cond: [ { $and: [ { $eq: ['$receiver', userId] }, { $eq: ['$read', false] } ] }, 1, 0 ] } },
+                totalMessages: { $sum: 1 }
+            }},
+            { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'participant' } },
+            { $unwind: { path: '$participant', preserveNullAndEmptyArrays: true } },
+            { $project: {
+                _id: 0,
+                participant: { _id: '$participant._id', fullName: '$participant.fullName', username: '$participant.username', email: '$participant.email', profilePicture: '$participant.profilePicture' },
+                lastMessage: {
+                    _id: '$lastMessage._id',
+                    sender: '$lastMessage.sender',
+                    receiver: '$lastMessage.receiver',
+                    message: '$lastMessage.message',
+                    imageUrls: '$lastMessage.imageUrls',
+                    read: '$lastMessage.read',
+                    createdAt: '$lastMessage.createdAt'
+                },
+                unreadCount: 1,
+                totalMessages: 1,
+                lastMessageAt: '$lastMessage.createdAt'
+            }},
+            { $sort: { lastMessageAt: -1 } },
+            { $skip: skip },
+            { $limit: limit }
+        ];
+
+        const conversations = await Message.aggregate(pipeline).allowDiskUse(true);
+        return res.json(conversations);
+    } catch (error) {
+        console.error('Error fetching conversations:', error);
+        return res.status(500).json({ error: 'Failed to fetch conversations', details: error.message });
     }
 }
 

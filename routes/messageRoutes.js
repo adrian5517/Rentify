@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
-const {getMessages, sendMessage, markMessagesAsRead} = require('../controllers/messageController');
+const {getMessages, sendMessage, markMessagesAsRead, getConversations} = require('../controllers/messageController');
+const { protect } = require('../middleware/authMiddleware');
 const Message = require('../models/messageModel');
 
 const router = express.Router();
@@ -12,7 +13,12 @@ const upload = multer ({ dest: 'temp/' });
 router.post('/send', upload.array('images'), sendMessage);
 
 //get Messages
+
+//get Messages
 router.get("/:userId1/:otherUserId", getMessages);
+
+// Get conversation summaries (protected)
+router.get('/conversations', protect, getConversations);
 
 //Mark messages as read
 router.post('/mark-read', markMessagesAsRead);
