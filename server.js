@@ -16,9 +16,9 @@ const upload = require('./middleware/uploadMiddleware'); // uses memoryStorage
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server,{
-  cors: { origin: '*'}
-})
+
+// ❌ REMOVE old socket.io here
+// const io = new Server(server,{ cors: { origin: '*' }});
 
 // Store online users
 const onlineUsers = new Map();
@@ -33,12 +33,9 @@ const passport = require('passport');
 require('./config/passport')(passport);
 app.use(passport.initialize());
 
-
-
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
-
 const { protect } = require('./middleware/authMiddleware');
 
 // Routes
@@ -46,29 +43,24 @@ app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use("/api/messages", messageRoute);
 
-
 // Example protected route
 app.get('/profile', protect, (req, res) => {
-  res.json(req.user); // User info from token
+  res.json(req.user);
 });
 
 // Cloudinary upload endpoint
-app.post('/upload', upload.array('propertyImage' , 5), async (req, res) => {
+app.post('/upload', upload.array('propertyImage', 5), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-    // Convert buffer to base64
     const base64Str = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-
-    // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(base64Str, {
-      folder: 'properties', // optional
-    });
+    const result = await cloudinary.uploader.upload(base64Str, { folder: 'properties' });
 
     res.status(200).json({
       message: 'Upload successful',
       fileUrl: result.secure_url,
     });
+
   } catch (error) {
     console.error('Cloudinary upload error:', error);
     res.status(500).json({ message: 'Upload failed', error: error.message });
@@ -76,10 +68,9 @@ app.post('/upload', upload.array('propertyImage' , 5), async (req, res) => {
 });
 
 // Cron job (every 15 minutes)
-const job = cron.schedule('*/15 * * * *', () => {
-  console.log('🕒 Cron job executed: Running every 15 minutes.');
+cron.schedule('*/15 * * * *', () => {
+  console.log('🕒 Cron job executed.');
 });
-job.start();
 
 // Load environment variables
 const DB_URI = process.env.DB_URI || '';
@@ -87,103 +78,95 @@ const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || '';
 
 if (!DB_URI || !PORT || !JWT_SECRET) {
-  console.error('❌ Error: Missing required environment variables.');
+  console.error('❌ Missing required env variables.');
   process.exit(1);
 }
 
-// MongoDB Connection and Server Start
-mongoose
-  .connect(DB_URI, {})
+// MongoDB Connection
+mongoose.connect(DB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
   })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
-  });
+  .catch(err => console.error('❌ MongoDB error:', err));
 
+// ------------------------------------------
+// ✅ FIXED & FINAL SOCKET.IO INITIALIZATION
+// ------------------------------------------
+const io = new Server(server, {
+  cors: { origin: "*" },
+  transports: ["websocket"],
+  pingTimeout: 60000,
+  pingInterval: 25000
+});
 
-// Socket.io setup
-io.on('connection', (socket)=>{
-  console.log("User connected:", socket.id)
+// Online users storage
+const onlineUsersMap = new Map();
 
-  socket.on('register', (userId) => {
-    onlineUsers.set(userId, socket.id);
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+  socket.on("register", (userId) => {
+    onlineUsersMap.set(userId, socket.id);
     console.log(`User ${userId} registered with socket ${socket.id}`);
-  })
-
-  // Typing indicator - user starts typing
-  socket.on('typing-start', ({ senderId, receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('typing-start', { senderId });
-    }
   });
 
-  // Typing indicator - user stops typing
-  socket.on('typing-stop', ({ senderId, receiverId }) => {
-    const receiverSocketId = onlineUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('typing-stop', { senderId });
-    }
+  socket.on("typing-start", ({ senderId, receiverId }) => {
+    const receiverSocketId = onlineUsersMap.get(receiverId);
+    if (receiverSocketId) io.to(receiverSocketId).emit("typing-start", { senderId });
   });
 
-  socket.on("private-message", async ({senderId, receiverId, text, images})=>{
+  socket.on("typing-stop", ({ senderId, receiverId }) => {
+    const receiverSocketId = onlineUsersMap.get(receiverId);
+    if (receiverSocketId) io.to(receiverSocketId).emit("typing-stop", { senderId });
+  });
+
+  socket.on("private-message", async ({ senderId, receiverId, text, images }) => {
     try {
       const newMessage = await Message.create({
         sender: senderId,
         receiver: receiverId,
         message: text,
         imageUrls: images || [],
-      })
+      });
 
-      const receiverSocketId = onlineUsers.get(receiverId);
-      if(receiverSocketId){
-        io.to(receiverSocketId).emit("private-message", newMessage)
-      }
-      
+      const receiverSocketId = onlineUsersMap.get(receiverId);
+      if (receiverSocketId) io.to(receiverSocketId).emit("private-message", newMessage);
+
     } catch (error) {
-      console.error("Error handling private-message:", error);
-    }
-  })
-
-  // Mark messages as read
-  socket.on('mark-as-read', async ({ userId, otherUserId }) => {
-    try {
-      // Update messages in database
-      const result = await Message.updateMany(
-        {
-          sender: otherUserId,
-          receiver: userId,
-          read: false
-        },
-        {
-          $set: { read: true }
-        }
-      );
-
-      // Notify the sender that their messages have been read
-      const senderSocketId = onlineUsers.get(otherUserId);
-      if (senderSocketId) {
-        io.to(senderSocketId).emit('messages-read', { 
-          readBy: userId, 
-          count: result.modifiedCount 
-        });
-      }
-    } catch (error) {
-      console.error("Error marking messages as read:", error);
+      console.error("Error private-message:", error);
     }
   });
 
-  socket.on("disconnect",()=>{
-    console.log("User disconnected:", socket.id)
-    for( let [userId , socketId] of onlineUsers){
-      if(socketId === socket.id){
-        onlineUsers.delete(userId);
+  socket.on("mark-as-read", async ({ userId, otherUserId }) => {
+    try {
+      const result = await Message.updateMany(
+        { sender: otherUserId, receiver: userId, read: false },
+        { $set: { read: true } }
+      );
+
+      const senderSocketId = onlineUsersMap.get(otherUserId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("messages-read", {
+          readBy: userId,
+          count: result.modifiedCount,
+        });
+      }
+
+    } catch (error) {
+      console.error("Error marking messages:", error);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+    for (let [userId, socketId] of onlineUsersMap) {
+      if (socketId === socket.id) {
+        onlineUsersMap.delete(userId);
         break;
       }
     }
-  })
-})
+  });
+});
