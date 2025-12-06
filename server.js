@@ -49,23 +49,9 @@ app.get('/profile', protect, (req, res) => {
 });
 
 // Cloudinary upload endpoint
-app.post('/upload', upload.array('propertyImage', 5), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-
-    const base64Str = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
-    const result = await cloudinary.uploader.upload(base64Str, { folder: 'properties' });
-
-    res.status(200).json({
-      message: 'Upload successful',
-      fileUrl: result.secure_url,
-    });
-
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
-    res.status(500).json({ message: 'Upload failed', error: error.message });
-  }
-});
+// Upload route (uses routes/upload.js)
+const uploadRoute = require('./routes/upload');
+app.use('/api/upload', uploadRoute);
 
 // Cron job (every 15 minutes)
 cron.schedule('*/15 * * * *', () => {
