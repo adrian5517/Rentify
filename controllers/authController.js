@@ -11,6 +11,22 @@ const registerUser = async (req, res) => {
     const { username, email, password, phoneNumber, role } = req.body;
 
     try {
+        // Server-side password policy:
+        // - Minimum length: 8
+        // - At least one uppercase letter
+        // - At least one number
+        // - At least one symbol (non-alphanumeric)
+        if (!password) {
+            return res.status(400).json({ message: 'Password is required' });
+        }
+
+        const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,}$/;
+        if (!passwordRegex.test(password)) {
+            return res.status(400).json({ 
+                message: 'Password does not meet complexity requirements. It must be at least 8 characters long and include at least one uppercase letter, one number, and one symbol.'
+            });
+        }
+
         // Check if email already exists
         const existingEmail = await User.findOne({ email });
         if (existingEmail) return res.status(400).json({ message: 'Email already exists' });
