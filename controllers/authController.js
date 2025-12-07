@@ -145,14 +145,39 @@ const logoutUser = async (req, res) => {
     }
 };
 
+const streamifier = require('streamifier');
+const cloudinary = require('../cloudinary');
+
+function uploadBufferToCloudinary(buffer, folder = 'rentify/profiles') {
+    return new Promise((resolve, reject) => {
+        try {
+            const stream = cloudinary.uploader.upload_stream({ folder }, (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+            });
+            streamifier.createReadStream(buffer).pipe(stream);
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
 const uploadProfilePicture = async (req, res) => {
     try {
         const userId = req.params.userId;
-        const { imageUrl } = req.body;
+        let { imageUrl } = req.body;
 
-        console.log('=== UPLOAD PROFILE PICTURE REQUEST ===');
-        console.log('User ID from params:', userId);
-        console.log('Image URL:', imageUrl);
+        // If files were uploaded (single-step flow), upload the first file to Cloudinary
+        if (req.files && req.files.length > 0) {
+            const file = req.files[0];
+            try {
+                const result = await uploadBufferToCloudinary(file.buffer, 'rentify/profiles');
+                imageUrl = result.secure_url || result.url;
+            } catch (err) {
+                console.error('Cloudinary upload failed:', err);
+                return res.status(500).json({ success: false, message: 'Image upload failed', error: String(err.message || err) });
+            }
+        }
 
         if (!imageUrl) {
             return res.status(400).json({ 
@@ -174,20 +199,10 @@ const uploadProfilePicture = async (req, res) => {
             });
         }
 
-        console.log('Profile picture updated successfully');
-
-        res.status(200).json({
-            success: true,
-            message: 'Profile picture updated successfully',
-            user
-        });
+        res.status(200).json({ success: true, message: 'Profile picture updated successfully', user });
     } catch (error) {
         console.error('Upload profile picture error:', error);
-        res.status(500).json({ 
-            success: false,
-            message: 'Error updating profile picture', 
-            error: error.message 
-        });
+        res.status(500).json({ success: false, message: 'Error updating profile picture', error: error.message });
     }
 };
 

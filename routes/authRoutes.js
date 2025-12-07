@@ -7,6 +7,7 @@ const User = require('../models/usersModel');
 const { generateOTP, sendOTPEmail } = require('../utils/emailService');
 const { storeOTP, getOTP, deleteOTP } = require('../utils/otpStore');
 const jwt = require('jsonwebtoken');
+const upload = require('../middleware/uploadMiddleware');
 
 router.post('/signup', registerUser);
 router.post('/login', loginUser );
@@ -57,7 +58,8 @@ router.get('/me', authMiddleware, (req, res) => {
 
 // New RESTful endpoints
 router.put('/users/:userId', updateProfile);
-router.put('/users/:userId/profile-picture', uploadProfilePicture);
+// Support single-step multipart upload: attach multer middleware here
+router.put('/users/:userId/profile-picture', upload.any(), uploadProfilePicture);
 router.get('/users/:userId', getUserById);
 router.get('/users', getAllUsers);
 
