@@ -60,6 +60,8 @@ router.get('/me', authMiddleware, (req, res) => {
 router.put('/users/:userId', updateProfile);
 // Support single-step multipart upload: attach multer middleware here
 router.put('/users/:userId/profile-picture', upload.any(), uploadProfilePicture);
+// Accept POST as well for uploads/clients that send POST (some forms or proxies may use POST)
+router.post('/users/:userId/profile-picture', upload.any(), uploadProfilePicture);
 router.get('/users/:userId', getUserById);
 router.get('/users', getAllUsers);
 

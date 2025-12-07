@@ -82,7 +82,17 @@ app.get('/profile', protect, (req, res) => {
 // Cloudinary upload endpoint
 // Upload route (uses routes/upload.js)
 const uploadRoute = require('./routes/upload');
+// Mount both `/api/upload` and legacy `/upload` so clients/proxies hitting either path work
 app.use('/api/upload', uploadRoute);
+app.use('/upload', uploadRoute);
+
+// Lightweight debug logger for upload/profile-picture requests to help diagnose client method issues
+app.use((req, res, next) => {
+  if (req.path.includes('/upload') || req.path.includes('/profile-picture')) {
+    console.log('[BACKEND DEBUG]', req.method, req.originalUrl, 'Origin:', req.headers.origin || '-', 'Auth present:', !!req.headers.authorization)
+  }
+  next()
+});
 
 // Cron job (every 15 minutes)
 cron.schedule('*/15 * * * *', () => {
