@@ -11,13 +11,26 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 // Get all properties with populated owner information
 exports.getAllProperties = async (req, res) => {
   try {
-    const properties = await Property.find()
-      .populate('postedBy', 'username email fullName profilePicture phoneNumber address')
-      .populate('createdBy', 'username email fullName profilePicture phoneNumber address')
-      .sort({ createdAt: -1 });
-    
+    // Pagination support
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Number(req.query.limit) || 20);
+    const skip = (page - 1) * limit;
+
+    const [properties, total] = await Promise.all([
+      Property.find()
+        .populate('postedBy', 'username email fullName profilePicture phoneNumber address')
+        .populate('createdBy', 'username email fullName profilePicture phoneNumber address')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Property.countDocuments(),
+    ]);
+
     res.json({
       success: true,
+      page,
+      limit,
+      total,
       count: properties.length,
       properties: properties
     });
@@ -30,6 +43,23 @@ exports.getAllProperties = async (req, res) => {
     });
   }
 };
+
+const MIN_PRICE = Number(process.env.MIN_PROPERTY_PRICE ?? 50000); // fallback 50k
+
+function validatePriceOrThrow(price) {
+  if (price == null || price === '') return; // allow missing if not required in updates; otherwise enforce below
+  const n = Number(price);
+  if (Number.isNaN(n)) {
+    const err = new Error('Invalid price value');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (n < MIN_PRICE) {
+    const err = new Error(`Price must be at least ₱${MIN_PRICE.toLocaleString()}`);
+    err.statusCode = 400;
+    throw err;
+  }
+}
 
 // Get single property by ID with populated owner information
 exports.getPropertyById = async (req, res) => {
@@ -59,6 +89,9 @@ exports.getPropertyById = async (req, res) => {
   }
 };
 
+
+
+
 // Create new property (requires authentication)
 exports.createProperty = async (req, res) => {
   try {
@@ -75,15 +108,11 @@ exports.createProperty = async (req, res) => {
       phoneNumber
     } = req.body;
 
-    // Get user ID from authenticated request (set by auth middleware)
-    const userId = req.user ? req.user._id : req.body.postedBy;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'User authentication required'
-      });
+    // Require authenticated user (route already uses protect middleware)
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
+    const userId = req.user._id;
 
     const imageUrls = [];
 
@@ -111,11 +140,28 @@ exports.createProperty = async (req, res) => {
       ? amenities.split(',').map(a => a.trim())
       : [];
 
+    // Validate price presence and value on create
+    try {
+      if (price === undefined || price === null || price === '') {
+        const err = new Error('Price is required');
+        err.statusCode = 400;
+        throw err;
+      }
+      validatePriceOrThrow(price);
+    } catch (err) {
+      console.error('Validation error:', err);
+      return res.status(err.statusCode || 400).json({ success: false, message: err.message });
+    }
+
     // Create property object
+    // Parse numeric latitude/longitude if provided
+    const lat = latitude !== undefined && latitude !== '' ? parseFloat(latitude) : undefined;
+    const lng = longitude !== undefined && longitude !== '' ? parseFloat(longitude) : undefined;
+
     const property = new Property({
       name,
       description,
-      location: { address, latitude, longitude },
+      location: { address, latitude: lat, longitude: lng },
       price: Number(price),
       propertyType,
       postedBy: userId,
@@ -125,6 +171,8 @@ exports.createProperty = async (req, res) => {
       phoneNumber,
       images: imageUrls
     });
+
+    
 
     await property.save();
     
@@ -161,8 +209,8 @@ exports.updateProperty = async (req, res) => {
       });
     }
 
-    // Check if user owns this property (if authenticated)
-    if (req.user && property.postedBy && property.postedBy.toString() !== req.user._id.toString()) {
+    // Check if user owns this property (if authenticated). Allow admins.
+    if (req.user && property.postedBy && property.postedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this property'
@@ -178,18 +226,36 @@ exports.updateProperty = async (req, res) => {
 
     // Update location if provided
     if (req.body.address || req.body.latitude || req.body.longitude) {
+      const newLat = req.body.latitude !== undefined && req.body.latitude !== '' ? parseFloat(req.body.latitude) : property.location.latitude;
+      const newLng = req.body.longitude !== undefined && req.body.longitude !== '' ? parseFloat(req.body.longitude) : property.location.longitude;
       property.location = {
         address: req.body.address || property.location.address,
-        latitude: req.body.latitude || property.location.latitude,
-        longitude: req.body.longitude || property.location.longitude
+        latitude: newLat,
+        longitude: newLng
       };
+      // remove location-related fields from further processing
       delete req.body.address;
       delete req.body.latitude;
       delete req.body.longitude;
     }
 
-    // Update other fields
-    Object.assign(property, req.body);
+    try {
+      if (req.body.price !== undefined) validatePriceOrThrow(req.body.price);
+    } catch (err) {
+      return res.status(err.statusCode || 400).json({ success: false, message: err.message });
+    }
+
+    // Whitelist allowed updatable fields to avoid overwriting protected fields
+    const allowed = ['name','description','price','propertyType','amenities','status','phoneNumber','images'];
+    for (const key of allowed) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+        if (key === 'price') {
+          property.price = Number(req.body.price);
+        } else {
+          property[key] = req.body[key];
+        }
+      }
+    }
     await property.save();
 
     // Populate before returning
