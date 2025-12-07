@@ -1,0 +1,100 @@
+{
+  "info": {
+    "name": "Rentify - Uploads (Local)",
+    "_postman_id": "a4f7d3b2-0000-4000-8000-000000000000",
+    "description": "Collection to test login, file upload, and profile-picture upload (single-step).\nLogin test will save `token` and `userId` to environment variables if returned.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": "{{baseUrl}}/api/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Save token and userId to environment if present",
+              "try {",
+              "  var json = pm.response.json();",
+              "  if (json.token) { pm.environment.set('token', json.token); }",
+              "  if (json.user && json.user._id) { pm.environment.set('userId', json.user._id); }",
+              "} catch (e) { /* ignore parse errors */ }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Upload (no auth)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "files",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/api/upload"
+      }
+    },
+    {
+      "name": "Upload Profile Picture (auth)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": []
+            }
+          ]
+        },
+        "url": "{{baseUrl}}/api/auth/users/{{userId}}/profile-picture"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:10000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
