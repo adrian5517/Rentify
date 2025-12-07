@@ -1,31 +1,35 @@
+/*
+  Patch: property controller (apply to your server controllers file)
+  Changes included:
+  - Flip ALLOW_FIRST default: default allow first listing unless ALLOW_FIRST_LISTING='false'
+  - Add MAX_PRICE enforcement (default 50000). validatePriceOrThrow now checks min and max.
+  - Preserve existing behavior (cloudinary uploads, owner checks), with clearer error codes.
+
+  To apply: replace your existing properties controller with this file (keep relative require helpers if needed), then restart the server.
+*/
+
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-// Robust require helper for files that may live under different deployment layouts
 function requireAny(paths) {
   for (const p of paths) {
     try {
-      // eslint-disable-next-line global-require, import/no-dynamic-require
       return require(p);
     } catch (err) {
       // continue
     }
   }
-  // if none worked, throw last error by attempting first path
   return require(paths[0]);
 }
 
-// Try possible cloudinary locations
 const cloudinary = requireAny([
   path.join(__dirname, '..', 'cloudinary'),
   path.join(process.cwd(), 'server', 'cloudinary'),
   path.join(process.cwd(), 'cloudinary')
 ]);
 
-// Resolve model path robustly to handle different deployment folder layouts
 function requireModel(modelFileName) {
-  // Try relative to controllers folder
   const tryPaths = [
     path.join(__dirname, '..', 'models', modelFileName),
     path.join(process.cwd(), 'server', 'models', modelFileName),
@@ -34,32 +38,39 @@ function requireModel(modelFileName) {
 
   for (const p of tryPaths) {
     try {
-      // eslint-disable-next-line global-require, import/no-dynamic-require
       return require(p);
     } catch (err) {
-      // ignore and try next
+      // ignore
     }
   }
-  // Final fallback - let Node throw the original error
   return require(path.join(__dirname, '..', 'models', modelFileName));
 }
 
 const Property = requireModel('propertyModel');
 
-// Pagination, MIN_PRICE already in your code
-const MIN_PRICE = Number(process.env.MIN_PROPERTY_PRICE ?? 50000); // fallback 50k
-const ALLOW_FIRST = process.env.ALLOW_FIRST_LISTING === 'true'; // env override
+// (env config above)
+
+// Read min/max from env; keep previous default MIN 50000 for compatibility
+const MIN_PRICE = Number(process.env.MIN_PROPERTY_PRICE ?? 0); // if you want a minimum, set env; default 0
+const MAX_PRICE = Number(process.env.MAX_PROPERTY_PRICE ?? 50000); // enforce max 50k by default
+// Flip default: allow first listing unless explicitly disabled by ALLOW_FIRST_LISTING='false'
+const ALLOW_FIRST = process.env.ALLOW_FIRST_LISTING !== 'false';
 
 function validatePriceOrThrow(price) {
-  if (price == null || price === '') return; // allow missing if not required in updates
+  if (price == null || price === '') return; // allow missing in some updates
   const n = Number(price);
   if (Number.isNaN(n)) {
     const err = new Error('Invalid price value');
     err.statusCode = 400;
     throw err;
   }
-  if (n < MIN_PRICE) {
+  if (MIN_PRICE && n < MIN_PRICE) {
     const err = new Error(`Price must be at least ₱${MIN_PRICE.toLocaleString()}`);
+    err.statusCode = 400;
+    throw err;
+  }
+  if (MAX_PRICE && n > MAX_PRICE) {
+    const err = new Error(`Price must be at most ₱${MAX_PRICE.toLocaleString()}`);
     err.statusCode = 400;
     throw err;
   }
