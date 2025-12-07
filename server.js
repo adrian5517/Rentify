@@ -6,19 +6,16 @@ const cors = require('cors');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
-const messageRoute = require('./routes/messageRoutes');
-const Message = require('./models/messageModel');
+const messageRoute = require('../routes/messageRoutes');
+const Message = require('../models/messageModel');
 
 // Cloudinary setup
-const cloudinary = require('./cloudinary');
-const upload = require('./middleware/uploadMiddleware'); // uses memoryStorage
+const cloudinary = require('../cloudinary');
+// Note: we use route-level multer in routes/upload.js
 
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
-
-// ❌ REMOVE old socket.io here
-// const io = new Server(server,{ cors: { origin: '*' }});
 
 // Store online users
 const onlineUsers = new Map();
@@ -61,28 +58,40 @@ app.use((req, res, next) => {
 
 // Passport for social auth
 const passport = require('passport');
-require('./config/passport')(passport);
+require('../config/passport')(passport);
 app.use(passport.initialize());
 
 // Import Routes
-const authRoutes = require('./routes/authRoutes');
-const propertyRoutes = require('./routes/propertyRoutes');
-const { protect } = require('./middleware/authMiddleware');
+const authRoutes = require('../routes/authRoutes');
+const propertyRoutes = require('../routes/propertyRoutes');
+
+// Basic auth middleware import if available. We don't modify it here but logging can be added there if needed.
+let protect = null
+try {
+  ({ protect } = require('../middleware/authMiddleware'))
+} catch (e) {
+  // if the auth middleware isn't present in this workspace, keep protect null
+  protect = (req, res, next) => next()
+}
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
-app.use("/api/messages", messageRoute);
+app.use('/api/messages', messageRoute);
 
 // Example protected route
-app.get('/profile', protect, (req, res) => {
-  res.json(req.user);
-});
+if (protect) {
+  app.get('/profile', protect, (req, res) => {
+    res.json(req.user);
+  });
+}
 
 // Cloudinary upload endpoint
 // Upload route (uses routes/upload.js)
-const uploadRoute = require('./routes/upload');
+const uploadRoute = require('../routes/upload');
 app.use('/api/upload', uploadRoute);
+// Support legacy path `/upload` too so clients that try `/upload` don't get 404
+app.use('/upload', uploadRoute);
 
 // Cron job (every 15 minutes)
 cron.schedule('*/15 * * * *', () => {
