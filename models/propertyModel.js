@@ -22,7 +22,7 @@ const propertySchema = new mongoose.Schema({
   amenities: [{ type: String }], // ✅ changed from String to Array of Strings
   status: {
     type: String,
-    enum: ['available', 'For rent', 'For sale', 'fully booked'],
+    enum: ['available', 'For rent', 'For sale', 'fully booked', 'Rented'],
     default: 'available'
   },
   rating:{
