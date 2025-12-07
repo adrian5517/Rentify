@@ -378,15 +378,30 @@ exports.deleteProperty = async (req, res) => {
 // Get properties by user ID (for user profile page)
 exports.getPropertiesByUser = async (req, res) => {
   try {
+    // Require authenticated user
+    if (!req.user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+    const { userId } = req.params;
+
+    // Only allow the authenticated user to fetch their own listings (admins allowed)
+    if (String(req.user._id) !== String(userId) && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
     const properties = await Property.find({
       $or: [
-        { postedBy: req.params.userId },
-        { createdBy: req.params.userId }
+        { postedBy: userId },
+        { createdBy: userId },
+        { 'owner.id': userId }
       ]
     })
-    .populate('postedBy', 'username email fullName profilePicture phoneNumber address')
-    .populate('createdBy', 'username email fullName profilePicture phoneNumber address')
-    .sort({ createdAt: -1 });
+      .populate('postedBy', 'username email fullName profilePicture phoneNumber address')
+      .populate('createdBy', 'username email fullName profilePicture phoneNumber address')
+      .sort({ createdAt: -1 });
+
+    // Prevent caching of user-specific listings
+    res.set('Cache-Control', 'private, no-store, max-age=0');
+    res.set('Surrogate-Control', 'no-store');
 
     res.json({
       success: true,
