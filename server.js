@@ -24,7 +24,32 @@ const server = http.createServer(app);
 const onlineUsers = new Map();
 
 // Middleware
-app.use(cors());
+const allowedOrigins = [
+  'https://rentify-web-beta.vercel.app',
+  'http://localhost:3000'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+// Prevent caching on API endpoints that require auth
+app.use((req, res, next) => {
+  // Only apply to API paths or specifically to /api/properties/user
+  if (req.path.startsWith('/api/properties/user') || (req.path.startsWith('/api/') && req.headers.authorization)) {
+    res.set('Cache-Control', 'private, no-store, max-age=0');
+    // Some CDNs respect Surrogate-Control
+    res.set('Surrogate-Control', 'no-store');
+  }
+  next();
+});
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('CORS policy violation'));
+  },
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
