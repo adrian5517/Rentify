@@ -1,8 +1,50 @@
-const Property = require('../../server/models/propertyModel'); // adjust path when pasting
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
-const cloudinary = require('../../server/cloudinary'); // adjust path when pasting
+
+// Robust require helper for files that may live under different deployment layouts
+function requireAny(paths) {
+  for (const p of paths) {
+    try {
+      // eslint-disable-next-line global-require, import/no-dynamic-require
+      return require(p);
+    } catch (err) {
+      // continue
+    }
+  }
+  // if none worked, throw last error by attempting first path
+  return require(paths[0]);
+}
+
+// Try possible cloudinary locations
+const cloudinary = requireAny([
+  path.join(__dirname, '..', 'cloudinary'),
+  path.join(process.cwd(), 'server', 'cloudinary'),
+  path.join(process.cwd(), 'cloudinary')
+]);
+
+// Resolve model path robustly to handle different deployment folder layouts
+function requireModel(modelFileName) {
+  // Try relative to controllers folder
+  const tryPaths = [
+    path.join(__dirname, '..', 'models', modelFileName),
+    path.join(process.cwd(), 'server', 'models', modelFileName),
+    path.join(process.cwd(), 'models', modelFileName),
+  ];
+
+  for (const p of tryPaths) {
+    try {
+      // eslint-disable-next-line global-require, import/no-dynamic-require
+      return require(p);
+    } catch (err) {
+      // ignore and try next
+    }
+  }
+  // Final fallback - let Node throw the original error
+  return require(path.join(__dirname, '..', 'models', modelFileName));
+}
+
+const Property = requireModel('propertyModel');
 
 // Pagination, MIN_PRICE already in your code
 const MIN_PRICE = Number(process.env.MIN_PROPERTY_PRICE ?? 50000); // fallback 50k
