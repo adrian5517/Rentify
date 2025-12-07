@@ -234,8 +234,10 @@ exports.updateProperty = async (req, res) => {
       });
     }
 
+    // Resolve owner id from multiple possible fields (defensive)
+    const ownerId = property.createdBy || property.postedBy || (property.owner && property.owner.id);
     // Check if user owns this property (if authenticated). Allow admins.
-    if (req.user && property.postedBy && property.postedBy.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (req.user && ownerId && String(ownerId) !== String(req.user._id) && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this property'
@@ -296,6 +298,11 @@ exports.updateProperty = async (req, res) => {
           property[key] = req.body[key];
         }
       }
+    }
+    // Force owner values to the authenticated user (defense in depth)
+    if (req.user) {
+      property.createdBy = req.user._id;
+      property.postedBy = req.user._id;
     }
     await property.save();
 
