@@ -88,10 +88,10 @@ router.post('/forgot-password', async (req, res) => {
 
         // Check if user exists
         const user = await User.findOne({ email: email.toLowerCase() });
-        if (!user) {
-            // Return explicit error so client can display a helpful message
-            return res.status(404).json({ 
-                message: 'Email not found' 
+         if (!user) {
+            // For security, don't reveal if email exists
+            return res.status(200).json({ 
+                message: 'If this email exists, an OTP has been sent' 
             });
         }
 
