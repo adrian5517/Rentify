@@ -1,6 +1,25 @@
 const User = require('../models/usersModel');
 
 const jwt = require('jsonwebtoken');
+const dns = require('dns').promises;
+
+// Basic email format regex (RFC-lite)
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+async function isEmailDeliverable(email) {
+    if (!email || !EMAIL_REGEX.test(email)) return false;
+    const domain = email.split('@')[1];
+    if (!domain) return false;
+
+    try {
+        const mxRecords = await dns.resolveMx(domain);
+        return Array.isArray(mxRecords) && mxRecords.length > 0;
+    } catch (err) {
+        // If MX lookup fails, consider undeliverable
+        console.warn('MX lookup failed for domain', domain, err && err.code ? err.code : err);
+        return false;
+    }
+}
 
 
 //Get users
@@ -26,6 +45,10 @@ const registerUser = async (req, res) => {
                 message: 'Password does not meet complexity requirements. It must be at least 8 characters long and include at least one uppercase letter, one number, and one symbol.'
             });
         }
+
+        // Check email deliverability to avoid fake emails
+        const emailDeliverable = await isEmailDeliverable(email)
+        if (!emailDeliverable) return res.status(400).json({ message: 'Email address appears invalid or undeliverable' })
 
         // Check if email already exists
         const existingEmail = await User.findOne({ email });
