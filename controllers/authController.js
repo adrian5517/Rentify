@@ -6,11 +6,107 @@ const dns = require('dns').promises;
 // Basic email format regex (RFC-lite)
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/**
+ * Check email deliverability.
+ * If `node-email-verifier` is installed in the backend project, prefer using it
+ * for a more thorough verification. Otherwise fall back to MX lookup.
+ */
 async function isEmailDeliverable(email) {
     if (!email || !EMAIL_REGEX.test(email)) return false;
     const domain = email.split('@')[1];
     if (!domain) return false;
 
+    // Configuration via environment
+    const STRICT = String(process.env.EMAIL_STRICT_VERIFICATION || '').toLowerCase() === 'true'
+    const RETRIES = Number(process.env.EMAIL_VERIFIER_RETRIES || 2)
+    const TIMEOUT_MS = Number(process.env.EMAIL_VERIFIER_TIMEOUT_MS || 5000)
+
+    // Helper: delay
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    // Try optional package first (if installed in the backend repo)
+    try {
+        // eslint-disable-next-line global-require, import/no-extraneous-dependencies
+        const EmailVerifier = require('node-email-verifier')
+        if (EmailVerifier) {
+            let lastErr = null
+            for (let attempt = 1; attempt <= Math.max(1, RETRIES); attempt++) {
+                try {
+                    // Some verifier libs expose either a verify function or a class.
+                    let result
+                    if (typeof EmailVerifier === 'function') {
+                        const inst = EmailVerifier()
+                        if (inst && typeof inst.verify === 'function') {
+                            // Respect TIMEOUT_MS by racing with a timeout promise
+                            result = await Promise.race([
+                                inst.verify(email),
+                                new Promise((_, rej) => setTimeout(() => rej(new Error('verifier timeout')), TIMEOUT_MS))
+                            ])
+                        } else if (typeof EmailVerifier.verify === 'function') {
+                            result = await Promise.race([
+                                EmailVerifier.verify(email),
+                                new Promise((_, rej) => setTimeout(() => rej(new Error('verifier timeout')), TIMEOUT_MS))
+                            ])
+                        }
+                    } else if (typeof EmailVerifier.verify === 'function') {
+                        result = await Promise.race([
+                            EmailVerifier.verify(email),
+                            new Promise((_, rej) => setTimeout(() => rej(new Error('verifier timeout')), TIMEOUT_MS))
+                        ])
+                    }
+
+                    // Interpret result
+                    if (typeof result === 'boolean') {
+                        if (STRICT) {
+                            // In strict mode a simple boolean true is accepted, false rejected
+                            return result === true
+                        }
+                        return result
+                    }
+
+                    if (!result) {
+                        throw new Error('email verifier returned no result')
+                    }
+
+                    // Accept results that explicitly indicate deliverable / valid
+                    const smtpOk = result.smtpCheck === true
+                    const explicitOk = result.isValid === true || result.success === true || result.valid === true
+                    const hasMx = Array.isArray(result.mxRecords) && result.mxRecords.length > 0
+
+                    if (STRICT) {
+                        // Strict: require SMTP-level check to pass (smtpCheck === true) or explicit ok
+                        if (smtpOk || explicitOk) return true
+                        // If verifier gave inconclusive but mx exists, consider it a fallback decision below
+                        return false
+                    }
+
+                    // Non-strict: accept any positive signal
+                    if (explicitOk || smtpOk || hasMx) return true
+
+                    return false
+                } catch (err) {
+                    lastErr = err
+                    // If transient network error, retry after small backoff
+                    const transientCodes = ['ETIMEDOUT', 'ECONNRESET', 'EAI_AGAIN', 'ENOTFOUND']
+                    const isTransient = err && err.code && transientCodes.includes(err.code.toString())
+                    if (attempt < RETRIES && isTransient) {
+                        await wait(250 * attempt)
+                        continue
+                    }
+                    // otherwise break and fallback to MX lookup
+                    console.warn('node-email-verifier attempt failed:', err && err.message ? err.message : err)
+                    break
+                }
+            }
+            if (lastErr) {
+                // fall through to MX lookup
+            }
+        }
+    } catch (e) {
+        // module not installed — continue to MX lookup fallback
+    }
+
+    // Fallback: perform DNS MX lookup
     try {
         const mxRecords = await dns.resolveMx(domain);
         return Array.isArray(mxRecords) && mxRecords.length > 0;

@@ -33,11 +33,10 @@ async function tryVerifier(email) {
   return null
 }
 
-async function verifyEmail(email) {
+async function verifyEmail(email, options = {}) {
   if (!email || !EMAIL_REGEX.test(email)) {
     return { email, deliverable: false, reason: 'invalid_format' }
   }
-
   // Try library first (if available)
   const libResult = await tryVerifier(email)
   if (libResult) {
@@ -45,7 +44,19 @@ async function verifyEmail(email) {
     if (typeof libResult === 'boolean') return { email, deliverable: libResult, method: 'verifier', detail: libResult }
     if (libResult.__error) return { email, deliverable: false, method: 'verifier', detail: libResult.__error }
 
-    const ok = Boolean(libResult.isValid || libResult.valid || libResult.success || libResult.smtpCheck === true || (Array.isArray(libResult.mxRecords) && libResult.mxRecords.length > 0))
+    const smtpOk = libResult.smtpCheck === true
+    const explicitOk = Boolean(libResult.isValid || libResult.valid || libResult.success)
+    const hasMx = Array.isArray(libResult.mxRecords) && libResult.mxRecords.length > 0
+
+    const strict = Boolean(options.strict)
+
+    let ok
+    if (strict) {
+      ok = smtpOk || explicitOk
+    } else {
+      ok = smtpOk || explicitOk || hasMx
+    }
+
     return { email, deliverable: ok, method: 'verifier', detail: libResult }
   }
 
@@ -59,8 +70,23 @@ async function verifyEmail(email) {
   }
 }
 
+const readline = require('readline')
+
 async function main() {
-  const args = process.argv.slice(2)
+  let args = process.argv.slice(2)
+
+  // If no args provided, prompt the user for comma-separated emails
+  if (args.length === 0) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+    const question = (q) => new Promise((resolve) => rl.question(q, resolve))
+    const answer = await question('Enter email(s) (comma-separated) or leave empty to use defaults: ')
+    rl.close()
+
+    if (answer && answer.trim()) {
+      args = answer.split(',').map(s => s.trim()).filter(Boolean)
+    }
+  }
+
   const toTest = args.length > 0 ? args : [
     'user@gmail.com',
     'invalid-email',
@@ -70,10 +96,13 @@ async function main() {
 
   console.log('Testing', toTest.length, 'email(s)')
   const results = []
+  // read --strict flag
+  const strict = args.includes('--strict') || process.env.EMAIL_STRICT_VERIFICATION === 'true'
+
   for (const email of toTest) {
     process.stdout.write(`Checking ${email} ... `)
     try {
-      const r = await verifyEmail(email)
+      const r = await verifyEmail(email, { strict })
       const ok = r.deliverable ? 'OK' : 'FAIL'
       console.log(ok)
       results.push(r)
