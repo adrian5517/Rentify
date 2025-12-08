@@ -235,9 +235,16 @@ exports.updateProperty = async (req, res) => {
     }
 
     if (req.body.address || req.body.latitude || req.body.longitude) {
-      const newLat = req.body.latitude !== undefined && req.body.latitude !== '' ? parseFloat(req.body.latitude) : property.location.latitude;
-      const newLng = req.body.longitude !== undefined && req.body.longitude !== '' ? parseFloat(req.body.longitude) : property.location.longitude;
-      property.location = { address: req.body.address || property.location.address, latitude: newLat, longitude: newLng };
+      // Be defensive: property.location may be undefined in some records
+      const prevLat = property.location && typeof property.location.latitude !== 'undefined' ? property.location.latitude : undefined;
+      const prevLng = property.location && typeof property.location.longitude !== 'undefined' ? property.location.longitude : undefined;
+      const prevAddr = property.location && typeof property.location.address !== 'undefined' ? property.location.address : '';
+
+      const newLat = req.body.latitude !== undefined && req.body.latitude !== '' ? parseFloat(req.body.latitude) : prevLat;
+      const newLng = req.body.longitude !== undefined && req.body.longitude !== '' ? parseFloat(req.body.longitude) : prevLng;
+      const newAddr = req.body.address !== undefined ? req.body.address : prevAddr;
+
+      property.location = { address: newAddr, latitude: newLat, longitude: newLng };
       delete req.body.address; delete req.body.latitude; delete req.body.longitude;
     }
 
