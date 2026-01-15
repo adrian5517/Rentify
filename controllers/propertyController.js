@@ -188,12 +188,34 @@ exports.submitVerification = async (req, res) => {
 exports.adminListPending = async (req, res) => {
   try {
     if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
-    const pending = await Property.find({ verification_status: 'pending' })
+    // Support server-side pagination and optional simple query filtering (q) for PoC
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Number(req.query.limit) || 20);
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+
+    // Fetch a reasonable cap of pending items, then filter in JS for simple q matching.
+    // For large datasets, implement Mongo aggregation or text indexes.
+    const CAP = 5000;
+    const allPending = await Property.find({ verification_status: 'pending' })
       .populate('postedBy', 'username email')
       .populate('createdBy', 'username email')
       .sort({ createdAt: -1 })
-      .limit(200);
-    res.json({ success: true, count: pending.length, properties: pending });
+      .limit(CAP);
+
+    let filtered = allPending;
+    if (q) {
+      filtered = allPending.filter(p => {
+        const name = (p.name || '').toString().toLowerCase();
+        const ownerEmail = (p.postedBy && (p.postedBy.email || p.postedBy.username) || '').toString().toLowerCase();
+        return name.includes(q) || ownerEmail.includes(q);
+      });
+    }
+
+    const total = filtered.length;
+    const start = (page - 1) * limit;
+    const properties = filtered.slice(start, start + limit);
+
+    res.json({ success: true, page, limit, total, count: properties.length, properties });
   } catch (error) {
     console.error('Admin list pending error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });

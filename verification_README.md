@@ -32,6 +32,15 @@ Base URL (local dev): `http://localhost:5000/api`
 
     curl -H "Authorization: Bearer <ADMIN_TOKEN>" "http://localhost:5000/api/properties/admin/pending"
 
+  - Server-side pagination (PoC): supported query params:
+    - `page` (default 1)
+    - `limit` (default 20, max 200)
+    - `q` (optional simple text filter on property name or owner email/username; PoC filters after fetching a capped result set)
+
+    Example (get first page, 20 items):
+
+    curl -H "Authorization: Bearer <ADMIN_TOKEN>" "http://localhost:5000/api/properties/admin/pending?page=1&limit=20&q=smith"
+
 - POST `/properties/admin/:id/verify`
   - Purpose: admin approves and marks the property as verified.
   - Auth: Bearer token (admin).

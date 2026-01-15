@@ -22,8 +22,8 @@ if (missing.length > 0) {
 
 async function listPending() {
   console.log('\n[admin] GET pending');
-  const res = await axios.get(`${BASE}/properties/admin/pending`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
-  console.log('status:', res.status, 'count:', res.data.count || (res.data.properties && res.data.properties.length));
+  const res = await axios.get(`${BASE}/properties/admin/pending?page=1&limit=20`, { headers: { Authorization: `Bearer ${ADMIN_TOKEN}` } });
+  console.log('status:', res.status, 'count:', res.data.count || (res.data.properties && res.data.properties.length), 'total:', res.data.total);
   return res.data;
 }
 
