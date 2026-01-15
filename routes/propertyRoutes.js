@@ -19,20 +19,14 @@ router.put('/:id', protect, controller.updateProperty);
 router.delete('/:id', protect, controller.deleteProperty);
 
 // Verification PoC routes
-router.post('/:id/verification/docs', protect, upload.array('docs', 5), controller.uploadVerificationDocuments);
-router.post('/:id/verification/submit', protect, controller.submitVerification);
-
-// Admin routes for verification management
-router.get('/admin/pending', protect, controller.adminListPending);
-router.post('/admin/:id/verify', protect, controller.adminVerify);
-router.post('/admin/:id/reject', protect, controller.adminReject);
-
 // Verification PoC routes
 router.post('/:id/verification/docs', protect, upload.array('docs', 5), controller.uploadVerificationDocuments);
 router.post('/:id/verification/submit', protect, controller.submitVerification);
 
 // Admin routes for verification management
 router.get('/admin/pending', protect, controller.adminListPending);
+router.get('/admin/verified', protect, controller.adminListByStatus);
+router.get('/admin/rejected', protect, controller.adminListByStatus);
 router.post('/admin/:id/verify', protect, controller.adminVerify);
 router.post('/admin/:id/reject', protect, controller.adminReject);
 

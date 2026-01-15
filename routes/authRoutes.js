@@ -8,13 +8,37 @@ const { generateOTP, sendOTPEmail } = require('../utils/emailService');
 const { storeOTP, getOTP, deleteOTP } = require('../utils/otpStore');
 const jwt = require('jsonwebtoken');
 const upload = require('../middleware/uploadMiddleware');
+const crypto = require('crypto');
+
+// In-memory store for OAuth state -> returnTo mapping.
+// This is intentionally simple for development/local usage. It is short-lived
+// and cleared on use. For distributed production deployments consider using
+// a persistent store (redis) or signed state values.
+const oauthStateStore = new Map();
 
 router.post('/signup', registerUser);
 router.post('/login', loginUser );
 router.post('/logout', logoutUser);
 
 // Facebook OAuth routes
-router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
+router.get('/facebook', (req, res, next) => {
+    // Optional `returnTo` query param indicates where to redirect the client after auth
+    // e.g. /api/auth/facebook?returnTo=http://localhost:3000
+    const { returnTo } = req.query || {};
+    // Generate a random state and store the mapping if returnTo was provided.
+    const state = crypto.randomBytes(16).toString('hex');
+    if (returnTo) {
+        try {
+            oauthStateStore.set(state, returnTo);
+        } catch (e) {
+            // If storing fails for any reason, continue without state mapping.
+            console.warn('Failed to store oauth state mapping', e);
+        }
+    }
+
+    // Initiate passport Facebook auth. Include state so it is round-tripped.
+    passport.authenticate('facebook', { scope: ['email'], state })(req, res, next);
+});
 
 router.get('/facebook/callback', (req, res, next) => {
     passport.authenticate('facebook', { session: false }, (err, user, info) => {
@@ -35,11 +59,27 @@ router.get('/facebook/callback', (req, res, next) => {
                 updatedAt: user.updatedAt
             };
 
-            // If CLIENT_URL is set, redirect the browser to the client with the token in the URL fragment
-            const clientUrl = process.env.CLIENT_URL;
+            // Determine where to redirect the browser. Prefer the returnTo value stored
+            // in the oauthStateStore (if provided during initiation), otherwise fall back
+            // to the environment CLIENT_URL. We use the state param returned by the
+            // provider to look up the stored returnTo.
+            const state = req.query && (req.query.state || req.body && req.body.state);
+            let clientUrl = null;
+            if (state && oauthStateStore.has(state)) {
+                clientUrl = oauthStateStore.get(state);
+                // clear it immediately
+                oauthStateStore.delete(state);
+            }
+            if (!clientUrl) clientUrl = process.env.CLIENT_URL;
+
             if (clientUrl) {
                 // Use fragment to avoid sending token to the server in Referer header
-                const redirectUrl = `${clientUrl.replace(/\/$/, '')}/auth#token=${token}`;
+                // If the provided returnTo already includes '/auth', just append the fragment,
+                // otherwise append '/auth#token=...'. Trim any trailing slashes first.
+                const trimmed = clientUrl.replace(/\/$/, '');
+                const hasAuthPath = /\/auth($|\/|#|\?)/.test(trimmed);
+                const redirectBase = hasAuthPath ? trimmed : `${trimmed}/auth`;
+                const redirectUrl = `${redirectBase}#token=${token}`;
                 return res.redirect(302, redirectUrl);
             }
 

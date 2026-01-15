@@ -47,6 +47,7 @@ function requireModel(modelFileName) {
 }
 
 const Property = requireModel('propertyModel');
+const Notification = requireModel('notificationModel');
 
 // (env config above)
 
@@ -90,23 +91,40 @@ exports.getAllProperties = async (req, res) => {
     const limit = Math.min(100, Number(req.query.limit) || 20);
     const skip = (page - 1) * limit;
 
+    // Default public listing: only show properties that have been verified
+    const baseQuery = {};
+    if (!req.user || req.user.role !== 'admin') {
+      baseQuery.verification_status = 'verified';
+    }
+
     const [properties, total] = await Promise.all([
-      Property.find()
+      Property.find(baseQuery)
         .populate('postedBy', 'username email fullName profilePicture phoneNumber address')
         .populate('createdBy', 'username email fullName profilePicture phoneNumber address')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
-      Property.countDocuments(),
+      Property.countDocuments(baseQuery),
     ]);
+
+    // Remove verification documents/history for non-admin and non-owner viewers
+    const cleaned = properties.map(p => {
+      const obj = p.toObject ? p.toObject() : p;
+      if (!req.user || (String(req.user._id) !== String(obj.postedBy?._id) && req.user.role !== 'admin')) {
+        delete obj.verification_documents;
+        delete obj.verification_history;
+        delete obj.verification_notes;
+      }
+      return obj;
+    });
 
     res.json({
       success: true,
       page,
       limit,
       total,
-      count: properties.length,
-      properties: properties
+      count: cleaned.length,
+      properties: cleaned
     });
   } catch (error) {
     console.error('Get all properties error:', error);
@@ -153,6 +171,17 @@ exports.uploadVerificationDocuments = async (req, res) => {
     }
 
     await property.save();
+
+    // Notify admins that a property has new verification documents (PoC: create notifications)
+    try {
+      const admins = await requireModel('usersModel').find({ role: 'admin' });
+      for (const admin of admins) {
+        await Notification.create({ user: admin._id, type: 'property_documents_uploaded', message: `Property "${property.name || 'untitled'}" has new verification documents.`, data: { propertyId: property._id }, read: false });
+      }
+    } catch (nerr) {
+      console.warn('Failed to create admin notifications for document upload', nerr.message);
+    }
+
     res.json({ success: true, message: 'Documents uploaded', added, property });
   } catch (error) {
     console.error('Upload verification docs error:', error);
@@ -177,6 +206,14 @@ exports.submitVerification = async (req, res) => {
     await property.save();
 
     // TODO: notify admins (email) — PoC skip
+    try {
+      const admins = await requireModel('usersModel').find({ role: 'admin' });
+      for (const admin of admins) {
+        await Notification.create({ user: admin._id, type: 'property_submitted', message: `Property "${property.name || 'untitled'}" was submitted for verification.`, data: { propertyId: property._id }, read: false });
+      }
+    } catch (nerr) {
+      console.warn('Failed to notify admins on submission', nerr.message);
+    }
 
     res.json({ success: true, message: 'Property submitted for verification', property });
   } catch (error) {
@@ -222,6 +259,42 @@ exports.adminListPending = async (req, res) => {
   }
 };
 
+// Generic admin list by verification status (e.g., verified, rejected)
+exports.adminListByStatus = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
+    const status = (req.query.status || (req.path && (req.path.includes('/verified') ? 'verified' : req.path.includes('/rejected') ? 'rejected' : 'pending')) || 'pending').toString();
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Number(req.query.limit) || 20);
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+
+    const CAP = 5000;
+    const all = await Property.find({ verification_status: status })
+      .populate('postedBy', 'username email')
+      .populate('createdBy', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(CAP);
+
+    let filtered = all;
+    if (q) {
+      filtered = all.filter(p => {
+        const name = (p.name || '').toString().toLowerCase();
+        const ownerEmail = (p.postedBy && (p.postedBy.email || p.postedBy.username) || '').toString().toLowerCase();
+        return name.includes(q) || ownerEmail.includes(q);
+      });
+    }
+
+    const total = filtered.length;
+    const start = (page - 1) * limit;
+    const properties = filtered.slice(start, start + limit);
+
+    res.json({ success: true, page, limit, total, count: properties.length, properties });
+  } catch (error) {
+    console.error('Admin list by status error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 exports.adminVerify = async (req, res) => {
   try {
     if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
@@ -237,7 +310,15 @@ exports.adminVerify = async (req, res) => {
     property.verification_history.push({ action: 'verified', by: req.user._id, at: new Date(), notes: property.verification_notes });
     await property.save();
 
-    // TODO: send notification to owner
+    // Notify owner
+    try {
+      const ownerId = property.createdBy || property.postedBy;
+      if (ownerId) {
+        await Notification.create({ user: ownerId, type: 'property_verified', message: `Your property "${property.name || 'untitled'}" has been approved by admin.`, data: { propertyId: property._id }, read: false });
+      }
+    } catch (nerr) {
+      console.warn('Failed to notify owner on verify', nerr.message);
+    }
 
     res.json({ success: true, message: 'Property verified', property });
   } catch (error) {
@@ -252,14 +333,26 @@ exports.adminReject = async (req, res) => {
     const property = await Property.findById(req.params.id);
     if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
 
+    // Require a rejection reason
+    const reason = (req.body.notes || '').toString().trim();
+    if (!reason) return res.status(400).json({ success: false, message: 'Rejection reason is required' });
+
     property.verification_status = 'rejected';
     property.verified = false;
-    property.verification_notes = req.body.notes || '';
+    property.verification_notes = reason;
     property.verification_history = property.verification_history || [];
     property.verification_history.push({ action: 'rejected', by: req.user._id, at: new Date(), notes: property.verification_notes });
     await property.save();
 
-    // TODO: notify owner
+    // Notify owner
+    try {
+      const ownerId = property.createdBy || property.postedBy;
+      if (ownerId) {
+        await Notification.create({ user: ownerId, type: 'property_rejected', message: `Your property "${property.name || 'untitled'}" was rejected: ${reason}`, data: { propertyId: property._id, reason }, read: false });
+      }
+    } catch (nerr) {
+      console.warn('Failed to notify owner on reject', nerr.message);
+    }
 
     res.json({ success: true, message: 'Property rejected', property });
   } catch (error) {
@@ -276,7 +369,15 @@ exports.getPropertyById = async (req, res) => {
 
     if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
 
-    res.json({ success: true, property });
+    const obj = property.toObject ? property.toObject() : property;
+    // Only owners or admins may see verification documents and history
+    if (!req.user || (String(req.user._id) !== String(obj.postedBy?._id) && req.user.role !== 'admin')) {
+      delete obj.verification_documents;
+      delete obj.verification_history;
+      delete obj.verification_notes;
+    }
+
+    res.json({ success: true, property: obj });
   } catch (error) {
     console.error('Get property by ID error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
@@ -377,6 +478,13 @@ exports.updateProperty = async (req, res) => {
     const ownerId = property.createdBy || property.postedBy || (property.owner && property.owner.id);
     if (req.user && ownerId && String(ownerId) !== String(req.user._id) && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized to update this property' });
+    }
+
+    // Owners may not edit while property is under review or already verified
+    if (req.user && ownerId && String(ownerId) === String(req.user._id) && req.user.role !== 'admin') {
+      if (property.verification_status === 'pending' || property.verification_status === 'verified') {
+        return res.status(403).json({ success: false, message: 'Property is under review or already verified. Edits are only allowed after rejection.' });
+      }
     }
 
     if (!ALLOW_FIRST && !(req.user.role && String(req.user.role).toLowerCase() === 'admin')) {
@@ -488,12 +596,27 @@ exports.searchProperties = async (req, res) => {
       query.amenities = { $in: amenitiesArray };
     }
 
+    // Default: only return verified properties to public consumers
+    if (!req.user || req.user.role !== 'admin') {
+      query.verification_status = 'verified';
+    }
     const properties = await Property.find(query)
       .populate('postedBy', 'username email fullName profilePicture phoneNumber address')
       .populate('createdBy', 'username email fullName profilePicture phoneNumber address')
       .sort({ createdAt: -1 });
 
-    res.json({ success: true, count: properties.length, properties });
+    // Remove verification documents/history for non-admin and non-owner viewers
+    const cleaned = properties.map(p => {
+      const obj = p.toObject ? p.toObject() : p;
+      if (!req.user || (String(req.user._id) !== String(obj.postedBy?._id) && req.user.role !== 'admin')) {
+        delete obj.verification_documents;
+        delete obj.verification_history;
+        delete obj.verification_notes;
+      }
+      return obj;
+    });
+
+    res.json({ success: true, count: cleaned.length, properties: cleaned });
   } catch (error) {
     console.error('Search properties error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });

@@ -67,12 +67,14 @@ app.use(passport.initialize());
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const { protect } = require('./middleware/authMiddleware');
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use("/api/messages", messageRoute);
+app.use('/api/notifications', notificationRoutes);
 
 // Example protected route
 app.get('/profile', protect, (req, res) => {
