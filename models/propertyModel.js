@@ -40,6 +40,19 @@ const propertySchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
+  ,
+  // Verification fields (for listing verification PoC)
+  verification_status: {
+    type: String,
+    enum: ['unverified','pending','verified','rejected'],
+    default: 'unverified'
+  },
+  verified: { type: Boolean, default: false },
+  verified_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  verified_at: { type: Date, default: null },
+  verification_notes: { type: String, default: '' },
+  verification_documents: [{ filename: String, url: String, uploaded_at: Date }],
+  verification_history: [{ action: String, by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, at: Date, notes: String }]
 });
 
 module.exports = mongoose.model('Property', propertySchema);

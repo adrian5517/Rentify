@@ -12,11 +12,31 @@ router.get('/search', controller.searchProperties); // keep before /:id
 // Protected user properties route
 router.get('/user/:userId', protect, controller.getPropertiesByUser);
 
-router.get('/:id', controller.getPropertyById);
 
 // Protected routes (require authentication)
 router.post('/', protect, upload.array('images', 5), controller.createProperty);
 router.put('/:id', protect, controller.updateProperty);
 router.delete('/:id', protect, controller.deleteProperty);
+
+// Verification PoC routes
+router.post('/:id/verification/docs', protect, upload.array('docs', 5), controller.uploadVerificationDocuments);
+router.post('/:id/verification/submit', protect, controller.submitVerification);
+
+// Admin routes for verification management
+router.get('/admin/pending', protect, controller.adminListPending);
+router.post('/admin/:id/verify', protect, controller.adminVerify);
+router.post('/admin/:id/reject', protect, controller.adminReject);
+
+// Verification PoC routes
+router.post('/:id/verification/docs', protect, upload.array('docs', 5), controller.uploadVerificationDocuments);
+router.post('/:id/verification/submit', protect, controller.submitVerification);
+
+// Admin routes for verification management
+router.get('/admin/pending', protect, controller.adminListPending);
+router.post('/admin/:id/verify', protect, controller.adminVerify);
+router.post('/admin/:id/reject', protect, controller.adminReject);
+
+// Dynamic property by id (placed after admin/static routes to avoid shadowing)
+router.get('/:id', controller.getPropertyById);
 
 module.exports = router;

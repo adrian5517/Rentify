@@ -114,6 +114,138 @@ exports.getAllProperties = async (req, res) => {
   }
 };
 
+// ---------------- Verification PoC Handlers ----------------
+
+exports.uploadVerificationDocuments = async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+
+    // Only owner or admin can upload verification docs
+    if (!req.user) return res.status(401).json({ success: false, message: 'Authentication required' });
+    const ownerId = property.createdBy || property.postedBy;
+    if (String(ownerId) !== String(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to upload documents for this property' });
+    }
+
+    if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
+
+    const added = [];
+    for (const file of req.files) {
+      try {
+        const base64Str = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        const uploadResult = await cloudinary.uploader.upload(base64Str, { folder: 'property_verification' });
+        const doc = { filename: file.originalname || uploadResult.public_id, url: uploadResult.secure_url, uploaded_at: new Date() };
+        property.verification_documents = property.verification_documents || [];
+        property.verification_documents.push(doc);
+        added.push(doc);
+      } catch (err) {
+        console.error('Verification doc upload failed:', err);
+      }
+    }
+
+    // Mark as pending automatically if documents were added
+    if (added.length > 0) {
+      property.verification_status = 'pending';
+      property.verified = false;
+      property.verification_history = property.verification_history || [];
+      property.verification_history.push({ action: 'documents_uploaded', by: req.user._id, at: new Date(), notes: `${added.length} files` });
+    }
+
+    await property.save();
+    res.json({ success: true, message: 'Documents uploaded', added, property });
+  } catch (error) {
+    console.error('Upload verification docs error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+exports.submitVerification = async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+    if (!req.user) return res.status(401).json({ success: false, message: 'Authentication required' });
+    const ownerId = property.createdBy || property.postedBy;
+    if (String(ownerId) !== String(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to submit verification for this property' });
+    }
+
+    property.verification_status = 'pending';
+    property.verified = false;
+    property.verification_history = property.verification_history || [];
+    property.verification_history.push({ action: 'submitted_for_verification', by: req.user._id, at: new Date(), notes: req.body.notes || '' });
+    await property.save();
+
+    // TODO: notify admins (email) — PoC skip
+
+    res.json({ success: true, message: 'Property submitted for verification', property });
+  } catch (error) {
+    console.error('Submit verification error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+exports.adminListPending = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
+    const pending = await Property.find({ verification_status: 'pending' })
+      .populate('postedBy', 'username email')
+      .populate('createdBy', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(200);
+    res.json({ success: true, count: pending.length, properties: pending });
+  } catch (error) {
+    console.error('Admin list pending error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+exports.adminVerify = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+
+    property.verification_status = 'verified';
+    property.verified = true;
+    property.verified_by = req.user._id;
+    property.verified_at = new Date();
+    property.verification_notes = req.body.notes || '';
+    property.verification_history = property.verification_history || [];
+    property.verification_history.push({ action: 'verified', by: req.user._id, at: new Date(), notes: property.verification_notes });
+    await property.save();
+
+    // TODO: send notification to owner
+
+    res.json({ success: true, message: 'Property verified', property });
+  } catch (error) {
+    console.error('Admin verify error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+exports.adminReject = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+
+    property.verification_status = 'rejected';
+    property.verified = false;
+    property.verification_notes = req.body.notes || '';
+    property.verification_history = property.verification_history || [];
+    property.verification_history.push({ action: 'rejected', by: req.user._id, at: new Date(), notes: property.verification_notes });
+    await property.save();
+
+    // TODO: notify owner
+
+    res.json({ success: true, message: 'Property rejected', property });
+  } catch (error) {
+    console.error('Admin reject error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 exports.getPropertyById = async (req, res) => {
   try {
     const property = await Property.findById(req.params.id)
