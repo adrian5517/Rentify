@@ -91,11 +91,9 @@ exports.getAllProperties = async (req, res) => {
     const limit = Math.min(100, Number(req.query.limit) || 20);
     const skip = (page - 1) * limit;
 
-    // Default public listing: only show properties that have been verified
+    // Default public listing: show all properties regardless of verification status.
+    // Verification documents remain hidden for non-owners/non-admins below.
     const baseQuery = {};
-    if (!req.user || req.user.role !== 'admin') {
-      baseQuery.verification_status = 'verified';
-    }
 
     const [properties, total] = await Promise.all([
       Property.find(baseQuery)
