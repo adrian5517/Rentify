@@ -237,6 +237,13 @@ exports.adminListPending = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(CAP);
 
+    // Debug log to help local development: print counts and sample statuses
+    try {
+      console.log(`[ADMIN] adminListPending: found ${allPending.length} pending items. Samples:`, allPending.slice(0,3).map(p => ({ id: p._id.toString(), verification_status: p.verification_status, verified: p.verified, history: (p.verification_history || []).slice(-3) })));
+    } catch (lgErr) {
+      // ignore logging errors
+    }
+
     let filtered = allPending;
     if (q) {
       filtered = allPending.filter(p => {
@@ -267,11 +274,24 @@ exports.adminListByStatus = async (req, res) => {
     const q = (req.query.q || '').toString().trim().toLowerCase();
 
     const CAP = 5000;
-    const all = await Property.find({ verification_status: status })
+    // Support legacy or boolean-only "verified" flag: when requesting "verified",
+    // include documents where either `verification_status: 'verified'` OR `verified: true`.
+    let findQuery = { verification_status: status };
+    if (status === 'verified') {
+      findQuery = { $or: [ { verification_status: 'verified' }, { verified: true } ] };
+    }
+    const all = await Property.find(findQuery)
       .populate('postedBy', 'username email')
       .populate('createdBy', 'username email')
       .sort({ createdAt: -1 })
       .limit(CAP);
+
+    // Debug log: show what was requested and some samples
+    try {
+      console.log(`[ADMIN] adminListByStatus: requested status=${status}, matched ${all.length} items. Samples:`, all.slice(0,3).map(p => ({ id: p._id.toString(), verification_status: p.verification_status, verified: p.verified, history: (p.verification_history || []).slice(-3) })));
+    } catch (lgErr) {
+      // ignore logging errors
+    }
 
     let filtered = all;
     if (q) {

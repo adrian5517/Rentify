@@ -106,20 +106,35 @@ const DB_URI = process.env.DB_URI || '';
 const PORT = process.env.PORT || 10000;
 const JWT_SECRET = process.env.JWT_SECRET || '';
 
-if (!DB_URI || !PORT || !JWT_SECRET) {
-  console.error('❌ Missing required env variables.');
-  process.exit(1);
+if (!PORT) {
+  console.error('❌ Missing required env variable: PORT. Using default 10000.');
 }
 
-// MongoDB Connection
-mongoose.connect(DB_URI)
-  .then(() => {
-    console.log('✅ Connected to MongoDB');
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+// Try to connect to MongoDB if DB_URI is provided. If not provided or connection fails,
+// continue to start the server so the frontend can still reach the API and we can surface
+// better error messages during local development. For production, ensure DB_URI and JWT_SECRET
+// are set and healthy.
+if (DB_URI) {
+  mongoose.connect(DB_URI)
+    .then(() => {
+      console.log('✅ Connected to MongoDB');
+      server.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+      });
+    })
+    .catch(err => {
+      console.error('❌ MongoDB error:', err);
+      console.warn('Starting server without a DB connection (development fallback).');
+      server.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT} (no DB connected)`);
+      });
     });
-  })
-  .catch(err => console.error('❌ MongoDB error:', err));
+} else {
+  console.warn('⚠️ DB_URI not provided. Starting server without DB connection (development fallback).');
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT} (no DB configured)`);
+  });
+}
 
 // ------------------------------------------
 // ✅ FIXED & FINAL SOCKET.IO INITIALIZATION
