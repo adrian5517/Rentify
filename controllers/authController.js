@@ -250,12 +250,14 @@ const loginUser = async (req, res) => {
 
                 // Set HttpOnly refresh token cookie (accessible only to server)
                 try {
-                    const cookieOpts = { httpOnly: true, sameSite: 'lax' };
+                    // Use SameSite=None to allow cross-origin requests (dev convenience).
+                    // In production ensure Secure=true and set COOKIE_DOMAIN appropriately.
+                    const cookieOpts = { httpOnly: true, sameSite: 'none' };
                     if (process.env.NODE_ENV === 'production') {
                         cookieOpts.secure = true;
                         cookieOpts.domain = process.env.COOKIE_DOMAIN || undefined;
                     }
-                    res.cookie('refreshToken', refreshToken, { ...cookieOpts, maxAge: 1000 * 60 * 60 * 24 * 7 });
+                    res.cookie('refreshToken', refreshToken, { ...cookieOpts, maxAge: 1000 * 60 * 60 * 24 * 7, path: '/' });
                 } catch (e) {
                     console.warn('Failed to set refresh token cookie:', e && e.message ? e.message : e);
                 }
@@ -360,14 +362,15 @@ const refreshAccessToken = async (req, res) => {
         await user.save();
 
         // Set cookie
-        try {
-          const cookieOpts = { httpOnly: true, sameSite: 'lax' };
-          if (process.env.NODE_ENV === 'production') {
-            cookieOpts.secure = true;
-            cookieOpts.domain = process.env.COOKIE_DOMAIN || undefined;
-          }
-          res.cookie('refreshToken', newRefreshToken, { ...cookieOpts, maxAge: 1000 * 60 * 60 * 24 * 7 });
-        } catch (e) {
+                try {
+                    // SameSite=None so refresh cookie is sent across origins during local development.
+                    const cookieOpts = { httpOnly: true, sameSite: 'none' };
+                    if (process.env.NODE_ENV === 'production') {
+                        cookieOpts.secure = true;
+                        cookieOpts.domain = process.env.COOKIE_DOMAIN || undefined;
+                    }
+                    res.cookie('refreshToken', newRefreshToken, { ...cookieOpts, maxAge: 1000 * 60 * 60 * 24 * 7, path: '/' });
+                } catch (e) {
           console.warn('Failed to set new refresh token cookie:', e && e.message ? e.message : e);
         }
 
