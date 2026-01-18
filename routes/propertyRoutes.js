@@ -27,6 +27,7 @@ router.post('/:id/verification/submit', protect, controller.submitVerification);
 router.get('/admin/pending', protect, controller.adminListPending);
 router.get('/admin/verified', protect, controller.adminListByStatus);
 router.get('/admin/rejected', protect, controller.adminListByStatus);
+router.get('/admin/unverified', protect, controller.adminListUnverified);
 router.post('/admin/:id/verify', protect, controller.adminVerify);
 router.post('/admin/:id/reject', protect, controller.adminReject);
 

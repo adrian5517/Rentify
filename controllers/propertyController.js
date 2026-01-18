@@ -313,6 +313,56 @@ exports.adminListByStatus = async (req, res) => {
   }
 };
 
+// Admin list for legacy/unverified properties (no verification_status set)
+exports.adminListUnverified = async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
+
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Number(req.query.limit) || 20);
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+
+    const CAP = 5000;
+    // Find properties where verification_status is missing/null/empty or not set to a known value
+    const all = await Property.find({
+      $or: [
+        { verification_status: { $exists: false } },
+        { verification_status: null },
+        { verification_status: '' }
+      ]
+    })
+      .populate('postedBy', 'username email')
+      .populate('createdBy', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(CAP);
+
+    let filtered = all;
+    if (q) {
+      filtered = all.filter(p => {
+        const name = (p.name || '').toString().toLowerCase();
+        const ownerEmail = (p.postedBy && (p.postedBy.email || p.postedBy.username) || '').toString().toLowerCase();
+        return name.includes(q) || ownerEmail.includes(q);
+      });
+    }
+
+    const total = filtered.length;
+    const start = (page - 1) * limit;
+    const properties = filtered.slice(start, start + limit);
+
+    // Debug log to help local development
+    try {
+      console.log(`[ADMIN] adminListUnverified: requested page=${page}, matched ${all.length} items, returning ${properties.length}. Samples:`, properties.slice(0,3).map(p => ({ id: p._id.toString(), verification_status: p.verification_status, verified: p.verified })));
+    } catch (lgErr) {
+      // ignore
+    }
+
+    res.json({ success: true, page, limit, total, count: properties.length, properties });
+  } catch (error) {
+    console.error('Admin list unverified error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 exports.adminVerify = async (req, res) => {
   try {
     if (!req.user || req.user.role !== 'admin') return res.status(403).json({ success: false, message: 'Admin access required' });
