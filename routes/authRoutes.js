@@ -79,8 +79,23 @@ router.get('/facebook/callback', (req, res, next) => {
                 const trimmed = clientUrl.replace(/\/$/, '');
                 const hasAuthPath = /\/auth($|\/|#|\?)/.test(trimmed);
                 const redirectBase = hasAuthPath ? trimmed : `${trimmed}/auth`;
-                const redirectUrl = `${redirectBase}#token=${token}`;
-                return res.redirect(302, redirectUrl);
+
+                // Build a safe redirect that includes the token both as a query param and as a fragment.
+                // Some CDNs or intermediaries may affect fragments; including the token in the query
+                // as well improves robustness. Use the URL API to avoid accidental double-`?` issues.
+                try {
+                    const u = new URL(redirectBase);
+                    u.searchParams.set('token', token);
+                    const redirectUrl = `${u.toString()}#token=${token}`;
+                    console.log('OAuth callback redirect prepared', { state, clientUrl, redirectUrl });
+                    return res.redirect(302, redirectUrl);
+                } catch (err) {
+                    // Fallback: if redirectBase isn't a full URL for some reason, append safely
+                    const sep = redirectBase.includes('?') ? '&' : '?';
+                    const redirectUrl = `${redirectBase}${sep}token=${token}#token=${token}`;
+                    console.log('OAuth callback redirect prepared (fallback)', { state, clientUrl, redirectUrl });
+                    return res.redirect(302, redirectUrl);
+                }
             }
 
             // Default: return JSON. Clients can store the token.
