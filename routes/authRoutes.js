@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { registerUser , loginUser , logoutUser , authMiddleware, uploadProfilePicture, updateProfile, getUserById, getAllUsers } = require ('../controllers/authController');
+const { registerUser , loginUser , logoutUser , refreshAccessToken, authMiddleware, uploadProfilePicture, updateProfile, getUserById, getAllUsers } = require ('../controllers/authController');
 const passport = require('passport');
 const User = require('../models/usersModel');
 const { generateOTP, sendOTPEmail } = require('../utils/emailService');
@@ -19,6 +19,7 @@ const oauthStateStore = new Map();
 router.post('/signup', registerUser);
 router.post('/login', loginUser );
 router.post('/logout', logoutUser);
+router.post('/refresh', refreshAccessToken);
 
 // Facebook OAuth routes
 router.get('/facebook', (req, res, next) => {

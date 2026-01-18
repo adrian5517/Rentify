@@ -3,6 +3,25 @@ const User = require('../models/usersModel');
 const jwt = require('jsonwebtoken');
 const dns = require('dns').promises;
 
+// Helper to read a cookie value from the request. If `cookie-parser` is present,
+// `req.cookies` will be used; otherwise fall back to parsing `req.headers.cookie`.
+function readCookie(req, name) {
+    try {
+        if (req.cookies && typeof req.cookies === 'object') return req.cookies[name];
+        const header = req.headers && (req.headers.cookie || req.headers.Cookie || req.headers.COOKIE);
+        if (!header) return undefined;
+        const parts = header.split(';').map(p => p.trim());
+        for (const part of parts) {
+            const [k, ...v] = part.split('=');
+            if (!k) continue;
+            if (k === name) return decodeURIComponent((v || []).join('='));
+        }
+        return undefined;
+    } catch (e) {
+        return undefined;
+    }
+}
+
 // Basic email format regex (RFC-lite)
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -216,8 +235,32 @@ const loginUser = async (req, res) => {
         }
 
         const token = user.generateAuthToken();
-        
-        // Don't send password in response
+                // Create a refresh token (rotateable) and store it on the user
+                const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_refresh_secret';
+                const refreshToken = jwt.sign({ id: user._id }, refreshSecret, { expiresIn: process.env.REFRESH_EXPIRES_IN || '7d' });
+
+                // Persist refresh token to user document
+                try {
+                    user.refreshTokens = user.refreshTokens || [];
+                    user.refreshTokens.push(refreshToken);
+                    await user.save();
+                } catch (e) {
+                    console.warn('Failed to persist refresh token for user:', e && e.message ? e.message : e);
+                }
+
+                // Set HttpOnly refresh token cookie (accessible only to server)
+                try {
+                    const cookieOpts = { httpOnly: true, sameSite: 'lax' };
+                    if (process.env.NODE_ENV === 'production') {
+                        cookieOpts.secure = true;
+                        cookieOpts.domain = process.env.COOKIE_DOMAIN || undefined;
+                    }
+                    res.cookie('refreshToken', refreshToken, { ...cookieOpts, maxAge: 1000 * 60 * 60 * 24 * 7 });
+                } catch (e) {
+                    console.warn('Failed to set refresh token cookie:', e && e.message ? e.message : e);
+                }
+
+                // Don't send password in response
         const userResponse = {
             _id: user._id,
             username: user.username,
@@ -242,7 +285,7 @@ const loginUser = async (req, res) => {
 };
 
 const authMiddleware = async (req, res, next) => {
-    const token = req.cookies?.token || req.headers['authorization']?.split(' ')[1];
+    const token = readCookie(req, 'token') || req.headers['authorization']?.split(' ')[1];
     if (!token) return res.status(401).json({ message: 'Unauthorized' });
 
     try {
@@ -251,16 +294,87 @@ const authMiddleware = async (req, res, next) => {
         if (!req.user) return res.status(401).json({ message: 'User not found' });
         next();
     } catch (error) {
+        // Log detailed token verification errors for local debugging (mask token)
+        try {
+            const masked = token ? `${String(token).slice(0,6)}...${String(token).slice(-6)}` : '<no-token>';
+            console.error('Auth middleware JWT verify failed:', { maskedToken: masked, error: error && error.message });
+        } catch (lgErr) {
+            console.error('Auth middleware verify error (failed to log token):', error && error.message);
+        }
         res.status(401).json({ message: 'Unauthorized', error: error.message });
     }
 };
 
 const logoutUser = async (req, res) => {
     try {
+        // Remove refresh token (if present) and clear cookie
+        const refreshToken = readCookie(req, 'refreshToken');
+        if (refreshToken) {
+            try {
+                const user = await User.findOne({ refreshTokens: refreshToken });
+                if (user) {
+                    user.refreshTokens = (user.refreshTokens || []).filter(t => t !== refreshToken);
+                    await user.save();
+                }
+            } catch (e) {
+                console.warn('Failed to remove refresh token on logout:', e && e.message ? e.message : e);
+            }
+        }
+        res.clearCookie('refreshToken');
         res.clearCookie('token');
         res.status(200).json({ message: 'Logout successful' });
     } catch (error) {
         res.status(500).json({ message: 'Error logging out', error: error.message });
+    }
+};
+
+// Refresh access token using refresh token cookie
+const refreshAccessToken = async (req, res) => {
+    try {
+        const refreshToken = readCookie(req, 'refreshToken');
+        if (!refreshToken) return res.status(401).json({ message: 'No refresh token' });
+
+        const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || 'dev_refresh_secret';
+        let decoded;
+        try {
+            decoded = jwt.verify(refreshToken, refreshSecret);
+        } catch (err) {
+            return res.status(401).json({ message: 'Invalid refresh token', error: err.message });
+        }
+
+        const user = await User.findById(decoded.id);
+        if (!user) return res.status(401).json({ message: 'User not found' });
+
+        // Check that this refresh token is still valid (in user's list)
+        if (!user.refreshTokens || !user.refreshTokens.includes(refreshToken)) {
+            return res.status(401).json({ message: 'Refresh token revoked' });
+        }
+
+        // Issue new access token (and rotate refresh token)
+        const newAccessToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: process.env.ACCESS_EXPIRES_IN || '1h' });
+
+        // Rotate refresh token: remove old, add new
+        const newRefreshToken = jwt.sign({ id: user._id }, refreshSecret, { expiresIn: process.env.REFRESH_EXPIRES_IN || '7d' });
+        user.refreshTokens = (user.refreshTokens || []).filter(t => t !== refreshToken);
+        user.refreshTokens.push(newRefreshToken);
+        await user.save();
+
+        // Set cookie
+        try {
+          const cookieOpts = { httpOnly: true, sameSite: 'lax' };
+          if (process.env.NODE_ENV === 'production') {
+            cookieOpts.secure = true;
+            cookieOpts.domain = process.env.COOKIE_DOMAIN || undefined;
+          }
+          res.cookie('refreshToken', newRefreshToken, { ...cookieOpts, maxAge: 1000 * 60 * 60 * 24 * 7 });
+        } catch (e) {
+          console.warn('Failed to set new refresh token cookie:', e && e.message ? e.message : e);
+        }
+
+        return res.status(200).json({ success: true, token: newAccessToken, user: { _id: user._id, username: user.username, email: user.email, role: user.role } });
+    } catch (error) {
+        console.error('Refresh token error:', error);
+        return res.status(500).json({ message: 'Failed to refresh token', error: error.message });
     }
 };
 
@@ -494,6 +608,7 @@ module.exports = {
     registerUser,
     loginUser,
     logoutUser,
+    refreshAccessToken,
     authMiddleware,
     uploadProfilePicture,
     updateProfile,

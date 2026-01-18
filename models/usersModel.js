@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema({
     address: { type: String },
     bio: { type: String },
     role: { type: String, enum: ['user', 'admin', 'renter'], default: 'user' },
+    refreshTokens: [{ type: String }],
 }, { timestamps: true });
 
 // Hash password before saving
