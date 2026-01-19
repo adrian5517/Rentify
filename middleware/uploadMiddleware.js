@@ -9,6 +9,9 @@ const ALLOWED_MIME_TYPES = [
 	'image/gif'
 ];
 
+// Allow PDFs for verification documents (frontend accepts .pdf)
+ALLOWED_MIME_TYPES.push('application/pdf');
+
 // Max file size in bytes (default 5MB) — configurable via env UPLOAD_MAX_FILE_SIZE
 const MAX_FILE_SIZE = Number(process.env.UPLOAD_MAX_FILE_SIZE || 5 * 1024 * 1024);
 
