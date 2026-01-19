@@ -70,7 +70,8 @@ async function run() {
     token = user.generateAuthToken()
   } catch (err) {
     const jwt = require('jsonwebtoken')
-    token = jwt.sign({ id: user._id, role: 'admin' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '30d' })
+    const adminExpiry = process.env.ADMIN_ACCESS_EXPIRES_IN || process.env.ACCESS_EXPIRES_IN || '30d'
+    token = jwt.sign({ id: user._id, role: 'admin' }, process.env.JWT_SECRET || 'dev-secret', { expiresIn: adminExpiry })
   }
 
   console.log('\n--- Admin created/updated ---')

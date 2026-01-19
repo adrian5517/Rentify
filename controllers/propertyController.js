@@ -147,11 +147,12 @@ exports.uploadVerificationDocuments = async (req, res) => {
     if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
 
     const added = [];
-    for (const file of req.files) {
+        for (const file of req.files) {
       try {
         const base64Str = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
         const uploadResult = await cloudinary.uploader.upload(base64Str, { folder: 'property_verification' });
-        const doc = { filename: file.originalname || uploadResult.public_id, url: uploadResult.secure_url, uploaded_at: new Date() };
+        // Save public_id so we can remove the media from Cloudinary later
+        const doc = { filename: file.originalname || uploadResult.public_id, url: uploadResult.secure_url, public_id: uploadResult.public_id, uploaded_at: new Date() };
         property.verification_documents = property.verification_documents || [];
         property.verification_documents.push(doc);
         added.push(doc);
@@ -183,6 +184,55 @@ exports.uploadVerificationDocuments = async (req, res) => {
     res.json({ success: true, message: 'Documents uploaded', added, property });
   } catch (error) {
     console.error('Upload verification docs error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// Delete a verification document (owner or admin)
+exports.deleteVerificationDocument = async (req, res) => {
+  try {
+    const property = await Property.findById(req.params.id);
+    if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
+
+    if (!req.user) return res.status(401).json({ success: false, message: 'Authentication required' });
+    const ownerId = property.createdBy || property.postedBy;
+    if (String(ownerId) !== String(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Not authorized to remove documents for this property' });
+    }
+
+    const { id, filename, url } = req.body || {};
+    if (!id && !filename && !url) return res.status(400).json({ success: false, message: 'Missing identifier for document to remove (id, filename or url)' });
+
+    property.verification_documents = property.verification_documents || [];
+    const docs = property.verification_documents;
+
+    const idx = docs.findIndex(d => (id && String(d._id) === String(id)) || (filename && d.filename === filename) || (url && d.url === url));
+    if (idx === -1) return res.status(404).json({ success: false, message: 'Document not found' });
+
+    const [removed] = docs.splice(idx, 1);
+    property.verification_documents = docs;
+    property.verification_history = property.verification_history || [];
+    property.verification_history.push({ action: 'document_removed', by: req.user._id, at: new Date(), notes: removed.filename || removed.url || 'removed' });
+
+    // Attempt to remove the media from Cloudinary if we have a public_id
+    try {
+      if (removed && removed.public_id && cloudinary && typeof cloudinary.uploader.destroy === 'function') {
+        try {
+          await cloudinary.uploader.destroy(removed.public_id);
+        } catch (cdelErr) {
+          // Log but do not fail the entire operation
+          console.warn('Cloudinary delete failed for', removed.public_id, cdelErr && cdelErr.message ? cdelErr.message : cdelErr);
+        }
+      }
+    } catch (e) {
+      // defensive: ignore
+    }
+
+    await property.save();
+
+    res.json({ success: true, message: 'Document removed', removed, property });
+  } catch (error) {
+    console.error('Delete verification doc error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };

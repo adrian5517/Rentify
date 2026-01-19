@@ -22,6 +22,7 @@ router.delete('/:id', protect, controller.deleteProperty);
 // Verification PoC routes
 router.post('/:id/verification/docs', protect, upload.array('docs', 5), controller.uploadVerificationDocuments);
 router.post('/:id/verification/submit', protect, controller.submitVerification);
+router.delete('/:id/verification/docs', protect, controller.deleteVerificationDocument);
 
 // Admin routes for verification management
 router.get('/admin/pending', protect, controller.adminListPending);

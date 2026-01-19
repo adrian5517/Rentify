@@ -32,7 +32,14 @@ userSchema.methods.comparePassword = async function (password) {
 
 // Generate JWT token
 userSchema.methods.generateAuthToken = function () {
-    return jwt.sign({ id: this._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Allow configuration via environment variables.
+    // - ACCESS_EXPIRES_IN: default expiry for regular users (e.g. '1h')
+    // - ADMIN_ACCESS_EXPIRES_IN: optional longer expiry for admins (e.g. '30d')
+    const defaultExpiry = process.env.ACCESS_EXPIRES_IN || '1h'
+    const adminExpiry = process.env.ADMIN_ACCESS_EXPIRES_IN || defaultExpiry
+    const expiresIn = (this.role === 'admin') ? adminExpiry : defaultExpiry
+    // Include role in payload for easier role-aware checks if needed
+    return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, { expiresIn });
 };
 
 module.exports = mongoose.model('User', userSchema);
