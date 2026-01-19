@@ -49,6 +49,23 @@ function requireModel(modelFileName) {
 const Property = requireModel('propertyModel');
 const Notification = requireModel('notificationModel');
 
+// Normalize incoming propertyType values to canonical lowercase enum members
+const ALLOWED_PROPERTY_TYPES = new Set(['apartment','house','condo','studio','townhouse','room','dorm','boarding house','other']);
+function normalizePropertyType(v) {
+  if (!v && v !== '') return 'other';
+  try {
+    const s = String(v).trim();
+    if (!s) return 'other';
+    const lower = s.toLowerCase();
+    if (ALLOWED_PROPERTY_TYPES.has(lower)) return lower;
+    // Accept common titlecase inputs by lowercasing
+    const canonical = lower.replace(/\s+/g, ' ');
+    if (ALLOWED_PROPERTY_TYPES.has(canonical)) return canonical;
+    // fallback to 'other'
+    return 'other';
+  } catch (e) { return 'other' }
+}
+
 // (env config above)
 
 // Read min/max from env; keep previous default MIN 50000 for compatibility
@@ -565,7 +582,7 @@ exports.createProperty = async (req, res) => {
       description,
       location: { address, latitude: lat, longitude: lng },
       price: Number(price),
-      propertyType,
+      propertyType: normalizePropertyType(propertyType),
       postedBy: userId,
       createdBy: userId,
       amenities: amenitiesArray,
@@ -634,6 +651,7 @@ exports.updateProperty = async (req, res) => {
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(req.body, key)) {
         if (key === 'price') property.price = Number(req.body.price);
+        else if (key === 'propertyType') property.propertyType = normalizePropertyType(req.body.propertyType);
         else property[key] = req.body[key];
       }
     }

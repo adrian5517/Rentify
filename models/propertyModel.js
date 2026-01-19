@@ -12,7 +12,7 @@ const propertySchema = new mongoose.Schema({
   price: { type: Number },
   propertyType: {
     type: String,
-    enum: ['apartment', 'house', 'condo', 'room', 'dorm', 'boarding house', 'other'],
+    enum: ['apartment', 'house', 'condo', 'studio', 'townhouse', 'room', 'dorm', 'boarding house', 'other'],
     default: 'other'
   },
   postedBy: {
@@ -51,7 +51,7 @@ const propertySchema = new mongoose.Schema({
   verified_by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   verified_at: { type: Date, default: null },
   verification_notes: { type: String, default: '' },
-  verification_documents: [{ filename: String, url: String, uploaded_at: Date }],
+  verification_documents: [{ filename: String, url: String, public_id: String, uploaded_at: Date }],
   verification_history: [{ action: String, by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, at: Date, notes: String }]
 });
 
