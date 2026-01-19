@@ -151,6 +151,7 @@ exports.getAllProperties = async (req, res) => {
 
 exports.uploadVerificationDocuments = async (req, res) => {
   try {
+    console.log('[UPLOAD] uploadVerificationDocuments called for property:', req.params.id, 'user:', req.user && req.user._id)
     const property = await Property.findById(req.params.id);
     if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
 
@@ -163,8 +164,10 @@ exports.uploadVerificationDocuments = async (req, res) => {
 
     if (!req.files || req.files.length === 0) return res.status(400).json({ success: false, message: 'No files uploaded' });
 
+    console.log('[UPLOAD] files received:', req.files.length)
+
     const added = [];
-        for (const file of req.files) {
+    for (const file of req.files) {
       try {
         const base64Str = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
         const uploadResult = await cloudinary.uploader.upload(base64Str, { folder: 'property_verification' });
@@ -174,16 +177,27 @@ exports.uploadVerificationDocuments = async (req, res) => {
         property.verification_documents.push(doc);
         added.push(doc);
       } catch (err) {
-        console.error('Verification doc upload failed:', err);
+        console.error('[UPLOAD] Verification doc upload failed for file:', file.originalname, err && err.message ? err.message : err);
       }
     }
 
-    // Mark as pending automatically if documents were added
+    // If cloudinary uploads succeeded for any files, mark pending.
     if (added.length > 0) {
       property.verification_status = 'pending';
       property.verified = false;
       property.verification_history = property.verification_history || [];
       property.verification_history.push({ action: 'documents_uploaded', by: req.user._id, at: new Date(), notes: `${added.length} files` });
+      console.log('[UPLOAD] added docs:', added.length, 'setting verification_status=pending')
+    } else {
+      // No docs added (cloudinary may have failed). Still force pending if files were submitted,
+      // so admins can manually check the property and uploaded files (or the owner can retry).
+      if (req.files && req.files.length > 0) {
+        property.verification_status = 'pending';
+        property.verified = false;
+        property.verification_history = property.verification_history || [];
+        property.verification_history.push({ action: 'documents_uploaded_attempted', by: req.user._id, at: new Date(), notes: `Attempted ${req.files.length} uploads (0 succeeded)` });
+        console.warn('[UPLOAD] no docs saved to DB but files were sent; forcing verification_status=pending for review')
+      }
     }
 
     await property.save();
@@ -197,6 +211,8 @@ exports.uploadVerificationDocuments = async (req, res) => {
     } catch (nerr) {
       console.warn('Failed to create admin notifications for document upload', nerr.message);
     }
+    await property.save();
+    console.log('[UPLOAD] post-save verification_status:', property.verification_status, 'verification_documents_count:', (property.verification_documents || []).length)
 
     res.json({ success: true, message: 'Documents uploaded', added, property });
   } catch (error) {
