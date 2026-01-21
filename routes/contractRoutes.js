@@ -12,7 +12,7 @@ router.post('/:id/docs', protect, upload.array('docs', 5), controller.uploadCont
 router.post('/:id/accept', protect, controller.acceptContract);
 const pdfController = require('../controllers/pdfController')
 router.get('/:id/pdf', protect, pdfController.generateContractPdf);
-router.post('/:id/cancel', protect, controller.cancelContract);
+router.post('/:id/propose-edit', protect, controller.proposeContractEdit);
 router.get('/property/:propertyId', protect, controller.listContractsByProperty);
 // Current user contracts
 router.get('/me', protect, controller.listContractsByUser);
