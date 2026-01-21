@@ -14,5 +14,7 @@ router.post('/:id/cancel', protect, controller.cancelContract);
 router.post('/:id/schedule', protect, controller.addPaymentSchedule);
 router.post('/:id/record-payment', protect, controller.recordPaymentAgainstContract);
 router.get('/property/:propertyId', protect, controller.listContractsByProperty);
+// Current user contracts
+router.get('/me', protect, controller.listContractsByUser);
 
 module.exports = router;
