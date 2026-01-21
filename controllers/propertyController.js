@@ -181,22 +181,43 @@ exports.uploadVerificationDocuments = async (req, res) => {
       }
     }
 
-    // If cloudinary uploads succeeded for any files, mark pending.
+    // Determine whether this upload should auto-submit for verification.
+    // By default, attaching documents does NOT change verification_status.
+    // To explicitly submit for admin verification when uploading, include `submit=true` in
+    // the form body or as a query parameter (e.g., ?submit=true).
+    const wantsSubmit = (() => {
+      try {
+        if (req.body && (req.body.submit === true || req.body.submit === 'true')) return true
+      } catch (e) {}
+      try {
+        if (req.query && (req.query.submit === 'true' || req.query.submit === '1')) return true
+      } catch (e) {}
+      return false
+    })()
+
+    // Always record upload attempts in history. Only mark `pending` when explicitly requested.
     if (added.length > 0) {
-      property.verification_status = 'pending';
-      property.verified = false;
       property.verification_history = property.verification_history || [];
       property.verification_history.push({ action: 'documents_uploaded', by: req.user._id, at: new Date(), notes: `${added.length} files` });
-      console.log('[UPLOAD] added docs:', added.length, 'setting verification_status=pending')
-    } else {
-      // No docs added (cloudinary may have failed). Still force pending if files were submitted,
-      // so admins can manually check the property and uploaded files (or the owner can retry).
-      if (req.files && req.files.length > 0) {
+      if (wantsSubmit) {
         property.verification_status = 'pending';
         property.verified = false;
+        console.log('[UPLOAD] added docs:', added.length, 'setting verification_status=pending')
+      } else {
+        console.log('[UPLOAD] added docs:', added.length, 'attachments saved (not submitted for verification)')
+      }
+    } else {
+      // No docs added (cloudinary may have failed). Record attempt but don't force pending unless requested.
+      if (req.files && req.files.length > 0) {
         property.verification_history = property.verification_history || [];
         property.verification_history.push({ action: 'documents_uploaded_attempted', by: req.user._id, at: new Date(), notes: `Attempted ${req.files.length} uploads (0 succeeded)` });
-        console.warn('[UPLOAD] no docs saved to DB but files were sent; forcing verification_status=pending for review')
+        if (wantsSubmit) {
+          property.verification_status = 'pending';
+          property.verified = false;
+          console.warn('[UPLOAD] no docs saved to DB but files were sent; forcing verification_status=pending for review')
+        } else {
+          console.warn('[UPLOAD] no docs saved to DB; attachments failed and not auto-submitting')
+        }
       }
     }
 
