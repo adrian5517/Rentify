@@ -68,6 +68,8 @@ app.use(passport.initialize());
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const contractRoutes = require('./routes/contractRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const { protect } = require('./middleware/authMiddleware');
 
 // Routes
@@ -75,6 +77,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use("/api/messages", messageRoute);
 app.use('/api/notifications', notificationRoutes);
+// Contracts and payments
+app.use('/api/contracts', contractRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Example protected route
 app.get('/profile', protect, (req, res) => {

@@ -1,0 +1,18 @@
+const express = require('express');
+const router = express.Router();
+const controller = require('../controllers/contractController');
+const upload = require('../middleware/uploadMiddleware');
+const { protect } = require('../middleware/authMiddleware');
+
+router.post('/', protect, controller.createContract);
+router.get('/user/:userId', protect, controller.listContractsByUser);
+router.get('/:id', protect, controller.getContract);
+router.put('/:id', protect, controller.updateContract);
+router.post('/:id/docs', protect, upload.array('docs', 5), controller.uploadContractDocument);
+router.post('/:id/accept', protect, controller.acceptContract);
+router.post('/:id/cancel', protect, controller.cancelContract);
+router.post('/:id/schedule', protect, controller.addPaymentSchedule);
+router.post('/:id/record-payment', protect, controller.recordPaymentAgainstContract);
+router.get('/property/:propertyId', protect, controller.listContractsByProperty);
+
+module.exports = router;
