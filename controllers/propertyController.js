@@ -647,9 +647,15 @@ exports.updateProperty = async (req, res) => {
     const property = await Property.findById(req.params.id);
     if (!property) return res.status(404).json({ success: false, message: 'Property not found' });
 
-    const ownerId = property.createdBy || property.postedBy || (property.owner && property.owner.id);
-    if (req.user && ownerId && String(ownerId) !== String(req.user._id) && req.user.role !== 'admin') {
+    // Normalize owner id whether stored as ObjectId, string, or populated object
+    const rawOwner = property.createdBy || property.postedBy || (property.owner && property.owner.id);
+    const ownerId = rawOwner ? (rawOwner._id ? String(rawOwner._id) : String(rawOwner)) : null;
+    const requesterId = req.user ? String(req.user._id) : null;
+    if (requesterId && ownerId && ownerId !== requesterId && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Not authorized to update this property' });
+    }
+    if (!requesterId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     // Owners may not edit while property is under review or already verified
