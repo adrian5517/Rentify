@@ -77,6 +77,8 @@ app.use('/api/properties', propertyRoutes);
 app.use("/api/messages", messageRoute);
 app.use('/api/notifications', notificationRoutes);
 // Contracts and payments
+console.log('contractRoutes type:', typeof contractRoutes);
+try { console.log('contractRoutes keys:', Object.keys(contractRoutes || {})); } catch (e) { console.log('contractRoutes keys error', e && e.message); }
 app.use('/api/contracts', contractRoutes);
 
 // Example protected route

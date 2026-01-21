@@ -4,7 +4,7 @@ const User = require('../models/usersModel')
 const { PDFDocument, StandardFonts, rgb } = require('pdf-lib')
 
 // Generate a simple signed PDF for a contract
-exports.generateContractPdf = async (req, res) => {
+const generateContractPdf = async (req, res) => {
   try {
     const id = req.params.id
     const contract = await Contract.findById(id).populate('property owner renter')
@@ -78,3 +78,5 @@ exports.generateContractPdf = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message })
   }
 }
+
+module.exports = { generateContractPdf };

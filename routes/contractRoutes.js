@@ -10,11 +10,14 @@ router.get('/:id', protect, controller.getContract);
 router.put('/:id', protect, controller.updateContract);
 router.post('/:id/docs', protect, upload.array('docs', 5), controller.uploadContractDocument);
 router.post('/:id/accept', protect, controller.acceptContract);
-const pdfController = require('../controllers/pdfController')
-router.get('/:id/pdf', protect, pdfController.generateContractPdf);
 router.post('/:id/propose-edit', protect, controller.proposeContractEdit);
 router.get('/property/:propertyId', protect, controller.listContractsByProperty);
 // Current user contracts
 router.get('/me', protect, controller.listContractsByUser);
+
+const pdfController = require('../controllers/pdfController')
+console.log('pdfController in routes:', pdfController);
+console.log('generateContractPdf in routes:', pdfController.generateContractPdf);
+router.get('/:id/pdf', protect, pdfController.generateContractPdf);
 
 module.exports = router;
