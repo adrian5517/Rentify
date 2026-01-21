@@ -254,7 +254,10 @@ exports.deleteVerificationDocument = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to remove documents for this property' });
     }
 
-    const { id, filename, url } = req.body || {};
+    // Accept identifier from either request body or query params (some proxies strip DELETE bodies)
+    const fromQuery = req.query || {};
+    const fromBody = req.body || {};
+    const { id, filename, url } = { ...fromQuery, ...fromBody };
     if (!id && !filename && !url) return res.status(400).json({ success: false, message: 'Missing identifier for document to remove (id, filename or url)' });
 
     property.verification_documents = property.verification_documents || [];
