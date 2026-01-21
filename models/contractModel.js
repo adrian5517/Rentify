@@ -15,9 +15,7 @@ const contractSchema = new mongoose.Schema({
   ownerAccepted: { accepted: { type: Boolean, default: false }, at: Date, signature: { name: String, ip: String, userAgent: String } },
   renterAccepted: { accepted: { type: Boolean, default: false }, at: Date, signature: { name: String, ip: String, userAgent: String } },
   // Payment linkage
-  payments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Payment' }],
-  // Payment schedule for installment payments
-  paymentSchedule: [{ dueDate: Date, amount: Number, status: { type: String, enum: ['due','paid','overdue'], default: 'due' }, payment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' } }],
+  // (payments removed) Payment and schedule fields were removed per product decision
   securityDeposit: { type: Number },
   totalAmount: { type: Number },
   history: [{ action: String, by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, at: Date, notes: String }],

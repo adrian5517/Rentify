@@ -141,61 +141,14 @@ exports.cancelContract = async (req, res) => {
 }
 
 // Add or replace a payment schedule for a contract
-exports.addPaymentSchedule = async (req, res) => {
-  try {
-    const id = req.params.id;
-    const { schedule, securityDeposit, totalAmount } = req.body;
-    const c = await Contract.findById(id);
-    if (!c) return res.status(404).json({ success: false, message: 'Contract not found' });
-
-    if (!Array.isArray(schedule) || schedule.length === 0) return res.status(400).json({ success: false, message: 'schedule array is required' });
-
-    c.paymentSchedule = schedule.map(item => ({ dueDate: item.dueDate ? new Date(item.dueDate) : null, amount: item.amount || 0, status: 'due' }));
-    if (securityDeposit) c.securityDeposit = securityDeposit;
-    if (totalAmount) c.totalAmount = totalAmount;
-    c.history.push({ action: 'payment_schedule_added', by: req.user?._id || null, at: new Date(), notes: '' });
-    await c.save();
-    return res.json({ success: true, contract: c });
-  } catch (err) {
-    console.error('addPaymentSchedule', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-}
-
-// Record a payment against a contract (links Payment to schedule)
-exports.recordPaymentAgainstContract = async (req, res) => {
-  try {
-    const id = req.params.id;
-    const { paymentId, scheduleIndex } = req.body;
-    if (!paymentId) return res.status(400).json({ success: false, message: 'paymentId is required' });
-    const c = await Contract.findById(id);
-    if (!c) return res.status(404).json({ success: false, message: 'Contract not found' });
-
-    // Link payment to contract payments array
-    c.payments = c.payments || [];
-    if (!c.payments.find(p => p.toString() === paymentId)) c.payments.push(paymentId);
-
-    // If scheduleIndex provided, link to that schedule item
-    if (typeof scheduleIndex === 'number' && c.paymentSchedule && c.paymentSchedule[scheduleIndex]) {
-      c.paymentSchedule[scheduleIndex].payment = paymentId;
-      c.paymentSchedule[scheduleIndex].status = 'paid';
-    }
-
-    c.history.push({ action: 'payment_recorded', by: req.user?._id || null, at: new Date(), notes: `Payment ${paymentId} recorded` });
-    await c.save();
-    return res.json({ success: true, contract: c });
-  } catch (err) {
-    console.error('recordPaymentAgainstContract', err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-}
+// Payment schedule and recording removed — endpoints deleted from routes.
 
 // List contracts for a specific property
 exports.listContractsByProperty = async (req, res) => {
   try {
     const propertyId = req.params.propertyId;
     if (!propertyId) return res.status(400).json({ success: false, message: 'propertyId is required' });
-    const contracts = await Contract.find({ property: propertyId }).populate('property owner renter payments').sort({ createdAt: -1 });
+    const contracts = await Contract.find({ property: propertyId }).populate('property owner renter').sort({ createdAt: -1 });
     return res.json({ success: true, contracts });
   } catch (err) {
     console.error('listContractsByProperty', err);
