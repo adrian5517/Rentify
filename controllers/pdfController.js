@@ -16,14 +16,14 @@ const generateContractPdf = async (req, res) => {
     }
 
     const ownerName = contract.owner?.name || contract.owner || ''
-    const ownerEmail = contract.owner?.email || ''
-    const ownerPhone = contract.owner?.phone || ''
-    const renterName = contract.renter?.name || contract.renter || ''
-    const renterEmail = contract.renter?.email || ''
-    const renterPhone = contract.renter?.phone || ''
-    const propAddress = contract.property?.address || contract.property?.name || ''
+    const ownerEmail = contract.owner?.email || 'No email provided'
+    const ownerPhone = contract.owner?.phone || 'No phone provided'
+    const renterName = contract.renter?.name || contract.renter || 'No name provided'
+    const renterEmail = contract.renter?.email || 'No email provided'
+    const renterPhone = contract.renter?.phone || 'No phone provided'
+    const propAddress = contract.property?.address || contract.property?.name || 'No address provided'
     const propType = contract.property?.type || contract.property?.propertyType || ''
-    const propDesc = contract.property?.description || ''
+    const propDesc = contract.property?.description || 'No description provided'
 
     const lines = []
     lines.push('RENTAL AGREEMENT')
