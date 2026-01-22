@@ -10,42 +10,75 @@ const generateContractPdf = async (req, res) => {
     const contract = await Contract.findById(id).populate('property owner renter')
     if (!contract) return res.status(404).json({ success: false, message: 'Contract not found' })
 
-    // Build a plain-text representation of the contract for the PDF
+    // Build a formal, clause-structured representation of the contract for the PDF
+    const fmt = (d) => {
+      try { return d ? (new Date(d)).toISOString().slice(0,10) : '' } catch (e) { return '' }
+    }
+
+    const ownerName = contract.owner?.name || contract.owner || ''
+    const ownerEmail = contract.owner?.email || ''
+    const ownerPhone = contract.owner?.phone || ''
+    const renterName = contract.renter?.name || contract.renter || ''
+    const renterEmail = contract.renter?.email || ''
+    const renterPhone = contract.renter?.phone || ''
+    const propAddress = contract.property?.address || contract.property?.name || ''
+    const propType = contract.property?.type || contract.property?.propertyType || ''
+    const propDesc = contract.property?.description || ''
+
     const lines = []
-    lines.push('Residential Rental Agreement')
+    lines.push('RENTAL AGREEMENT')
     lines.push('')
     lines.push(`Contract ID: ${contract._id}`)
-    lines.push(`Property: ${contract.property?.address || contract.property || ''}`)
-    lines.push(`Owner: ${contract.owner?.name || contract.owner || ''}`)
-    lines.push(`Renter: ${contract.renter?.name || contract.renter || ''}`)
+    lines.push(`Effective Date: ${contract.createdAt ? fmt(contract.createdAt) : fmt(new Date())}`)
     lines.push('')
-    lines.push(`Effective: ${contract.createdAt ? contract.createdAt.toISOString() : new Date().toISOString()}`)
+    lines.push('PARTIES:')
+    lines.push(`  Owner / Landlord: ${ownerName}`)
+    if (ownerEmail) lines.push(`    Email: ${ownerEmail}`)
+    if (ownerPhone) lines.push(`    Phone: ${ownerPhone}`)
+    lines.push(`  Tenant / Renter: ${renterName}`)
+    if (renterEmail) lines.push(`    Email: ${renterEmail}`)
+    if (renterPhone) lines.push(`    Phone: ${renterPhone}`)
     lines.push('')
-    lines.push('Term:')
-    lines.push(`  Start: ${contract.startDate ? contract.startDate.toISOString().slice(0,10) : ''}`)
-    lines.push(`  End:   ${contract.endDate ? contract.endDate.toISOString().slice(0,10) : ''}`)
+    lines.push('PROPERTY:')
+    lines.push(`  Address: ${propAddress}`)
+    if (propType) lines.push(`  Type: ${propType}`)
+    if (propDesc) lines.push(`  Description: ${propDesc}`)
     lines.push('')
-    lines.push('Payment:')
-    lines.push(`  Rent: ${contract.rentAmount || ''} ${contract.currency || ''}`)
-    lines.push(`  Security deposit: ${contract.securityDeposit || ''}`)
+    lines.push('TERM:')
+    lines.push(`  Commencement: ${contract.startDate ? fmt(contract.startDate) : ''}`)
+    lines.push(`  Termination: ${contract.endDate ? fmt(contract.endDate) : ''}`)
+    if (contract.renewalTerms) lines.push(`  Renewal: ${contract.renewalTerms}`)
     lines.push('')
-    lines.push('Signatures:')
+    lines.push('RENT AND PAYMENT:')
+    lines.push(`  Monthly Rent: ${contract.rentAmount || ''} ${contract.currency || ''}`)
+    if (contract.dueDay) lines.push(`  Rent Due Day: ${contract.dueDay}`)
+    if (contract.lateFee) lines.push(`  Late Fee: ${contract.lateFee}`)
+    lines.push(`  Security Deposit: ${contract.securityDeposit || ''} ${contract.currency || ''}`)
+    lines.push('')
+    lines.push('USE AND MAINTENANCE:')
+    lines.push('  Tenant shall use the Property as a residential dwelling and maintain it in good condition.')
+    lines.push('')
+    lines.push('TERMINATION:')
+    lines.push('  Termination and notice provisions are governed by applicable law and this Agreement.')
+    lines.push('')
+    lines.push('DIGITAL ACCEPTANCE:')
+    lines.push('  The parties agree that electronic acceptance via the web application (checkbox with recorded signature name and timestamp) constitutes a valid signature.')
+    lines.push('')
+    lines.push('SIGNATURES:')
     if (contract.ownerAccepted && contract.ownerAccepted.accepted) {
-      lines.push(`  Owner: ${contract.ownerAccepted.signature?.name || contract.owner?.name || ''}`)
-      lines.push(`    At: ${contract.ownerAccepted.at ? contract.ownerAccepted.at.toISOString() : ''}`)
+      lines.push(`  Owner: ${contract.ownerAccepted.signature?.name || ownerName}`)
+      if (contract.ownerAccepted.at) lines.push(`    Signed at: ${fmt(contract.ownerAccepted.at)}`)
     } else {
       lines.push('  Owner: (not signed)')
     }
-
     if (contract.renterAccepted && contract.renterAccepted.accepted) {
-      lines.push(`  Renter: ${contract.renterAccepted.signature?.name || contract.renter?.name || ''}`)
-      lines.push(`    At: ${contract.renterAccepted.at ? contract.renterAccepted.at.toISOString() : ''}`)
+      lines.push(`  Renter: ${contract.renterAccepted.signature?.name || renterName}`)
+      if (contract.renterAccepted.at) lines.push(`    Signed at: ${fmt(contract.renterAccepted.at)}`)
     } else {
       lines.push('  Renter: (not signed)')
     }
-
     lines.push('')
-    lines.push('This document was generated by the Rentify web application.')
+    lines.push('This document was generated by the Rentify web application and is a summary of the agreement between the parties.')
 
     // Create PDF
     const pdfDoc = await PDFDocument.create()
