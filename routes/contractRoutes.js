@@ -20,6 +20,7 @@ router.get('/property/:propertyId', protect, controller.listContractsByProperty)
 const pdfController = require('../controllers/pdfController')
 console.log('pdfController in routes:', pdfController);
 console.log('generateContractPdf in routes:', pdfController.generateContractPdf);
+// Restored protect middleware on the PDF route
 router.get('/:id/pdf', protect, pdfController.generateContractPdf);
 
 module.exports = router;
