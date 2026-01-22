@@ -18,6 +18,7 @@ router.get('/property/:propertyId', protect, controller.listContractsByProperty)
 // (other routes remain)
 
 const pdfController = require('../controllers/pdfController')
+// Restore protected PDF route
 router.get('/:id/pdf', protect, pdfController.generateContractPdf);
 
 module.exports = router;

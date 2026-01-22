@@ -30,8 +30,11 @@ const generateContractPdf = async (req, res) => {
     const ownerName = safe(contract.owner, 'No name provided')
     const ownerEmail = safe(contract.owner && contract.owner.email, 'No email provided')
     const ownerPhone = safe(contract.owner && (contract.owner.phone || contract.owner.phoneNumber), 'No phone provided')
-    const renterName = safe(contract.renter, 'No name provided')
-    const renterEmail = safe(contract.renter && contract.renter.email, 'No email provided')
+    // If renter not populated, fall back to recorded signature name/email if available
+    const renterSignatureName = contract.renterAccepted && contract.renterAccepted.signature && contract.renterAccepted.signature.name
+    const renterSignatureEmail = contract.renterAccepted && contract.renterAccepted.signature && contract.renterAccepted.signature.email
+    const renterName = safe(contract.renter, '') || safe(renterSignatureName, 'No name provided')
+    const renterEmail = safe(contract.renter && contract.renter.email, '') || safe(renterSignatureEmail, 'No email provided')
     const renterPhone = safe(contract.renter && (contract.renter.phone || contract.renter.phoneNumber), 'No phone provided')
     const propAddress = safe(contract.property && (contract.property.address || contract.property.name), 'No address provided')
     const propType = safe(contract.property && (contract.property.type || contract.property.propertyType), '')
